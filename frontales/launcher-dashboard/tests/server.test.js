@@ -111,3 +111,22 @@ test('startDashboardServer sirve los archivos JavaScript del dashboard', async (
   const scriptBody = await scriptResponse.text();
   assert.match(scriptBody, /loadDashboardLayout/);
 });
+
+test('startDashboardServer expone el widget de ecommerce del dominio de ventas digitales', async (t) => {
+  const { url, close } = await startDashboardServer({ port: 0 });
+  t.after(close);
+
+  const widgetResponse = await fetch(new URL('/widgets/ventasdigitales/ecommerce/widget', url));
+  assert.equal(widgetResponse.status, 200);
+  const widgetBody = await widgetResponse.text();
+  assert.match(widgetBody, /data-widget-id="ventasdigitales-ecommerce"/);
+  assert.match(widgetBody, /widget-client\.jsx/);
+
+  const clientResponse = await fetch(
+    new URL('/widgets/ventasdigitales/ecommerce/widget-client.jsx', url),
+  );
+  assert.equal(clientResponse.status, 200);
+  const clientBody = await clientResponse.text();
+  assert.match(clientBody, /SKU-ACOUSTIC-01/);
+  assert.match(clientBody, /OrderConfirmed/);
+});

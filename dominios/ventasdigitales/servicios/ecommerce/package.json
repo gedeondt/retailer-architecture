@@ -1,0 +1,14 @@
+{
+  "name": "@retailer/ventasdigitales-ecommerce",
+  "version": "0.1.0",
+  "description": "Microfrontend de ecommerce para el dominio de ventas digitales",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
