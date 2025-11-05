@@ -13,7 +13,7 @@ function createDashboardHTML() {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Launcher Retailer - Dashboard Maestro</title>
     <link
-      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css"
+      href="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
       rel="stylesheet"
     />
   </head>
