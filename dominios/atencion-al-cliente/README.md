@@ -10,9 +10,12 @@ Resuelve consultas, incidencias y reclamaciones de clientes a lo largo del ciclo
 
 ## Responsabilidades en el flujo del pedido
 - Registrar y priorizar casos relacionados con pedidos, envíos y devoluciones.
-- Coordinar ajustes con logística (reenvíos, cambios de dirección) y contabilidad (notas de crédito, reembolsos).
+- Coordinar ajustes con logística (reenvíos, cambios de dirección) y contabilidad (reembolsos de reclamaciones).
 - Mantener informado al cliente sobre el progreso de su caso y retroalimentar a ventas digitales.
 
 ## Historias de usuario
 1. Como **agente del contact center** quiero ver el historial completo del pedido para brindar respuestas consistentes al cliente.
 2. Como **cliente** quiero iniciar una reclamación por producto dañado desde el portal de ayuda para obtener una solución rápida.
+
+## Modelo de entidades
+- [Entidades del dominio de Atención al Cliente](entities.md)

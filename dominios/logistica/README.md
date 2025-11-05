@@ -18,3 +18,6 @@ Coordina el fulfillment, almacenamiento, transporte y devoluciones físicas de l
 1. Como **operador de almacén** quiero acceder a las tareas de picking.
 2. Como **operador de almacén** quiero confirmar la preparación de un envío para que la empresa de logística proceda a su recogida y entrega.
 3. Como **operador de almacén** quiero registrar el estado físico del producto devuelto para informar a contabilidad y ventas digitales.
+
+## Modelo de entidades
+- [Entidades del dominio de Logística](entities.md)

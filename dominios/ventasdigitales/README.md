@@ -20,3 +20,6 @@ Gestiona la experiencia de compra digital: navegación, carrito, pricing, promoc
 3. Como **cliente digital** quiero iniciar una reclamación de un pedido y ser su evolución.
 4. Como **cliente digital** quiero descargar las facturas de mis pedidos.
 
+## Modelo de entidades
+- [Entidades del dominio de Ventas Digitales](entities.md)
+

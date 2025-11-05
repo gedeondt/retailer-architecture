@@ -26,6 +26,15 @@ Imaginamos un retailer omnicanal con canales digitales de venta, centros de dist
 
 Cada dominio cuenta con una descripción de su responsabilidad, equipos involucrados, usuarios clave y un conjunto inicial de historias de usuario que guían el desarrollo de sus microservicios y microfrontends.
 
+## Documentación de entidades de negocio
+
+Para consolidar un lenguaje compartido entre equipos, cada dominio incluye un fichero `entities.md` que describe las entidades relevantes desde el punto de vista de negocio. El formato es homogéneo: por cada entidad se documenta una breve descripción y la lista de atributos clave que intervienen en los flujos actuales.
+
+- [Entidades de Ventas Digitales](dominios/ventasdigitales/entities.md)
+- [Entidades de Atención al Cliente](dominios/atencion-al-cliente/entities.md)
+- [Entidades de Logística](dominios/logistica/entities.md)
+- [Entidades de Contabilidad](dominios/contabilidad/entities.md)
+
 ## Lineamientos de implementación
 
 Para mantener la coherencia del ecosistema, todas las piezas de software deberán apegarse a los siguientes criterios operativos y de arquitectura:
