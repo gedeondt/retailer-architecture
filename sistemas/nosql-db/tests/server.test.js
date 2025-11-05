@@ -77,6 +77,7 @@ test('startNosqlService expone la API CRUD y de búsqueda', async (t) => {
 test('renderWidgetShell genera un fragmento de widget listo para React', () => {
   const html = renderWidgetShell({ apiOrigin: 'http://example.test:1234' });
   assert.match(html, /data-widget-id="sistemas-nosql-db"/);
+  assert.match(html, /data-widget-size="1"/);
   assert.match(html, /data-api-origin="http:\/\/example\.test:1234"/);
   assert.match(html, /<script src="https:\/\/unpkg\.com\/react@18\/umd\/react\.development\.js"/);
   assert.match(html, /<script src="https:\/\/unpkg\.com\/react-dom@18\/umd\/react-dom\.development\.js"/);

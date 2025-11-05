@@ -1,7 +1,7 @@
 'use strict';
 
 const WIDGET_ID = 'sistemas-nosql-db';
-const WIDGET_SIZE = '2';
+const WIDGET_SIZE = '1';
 const WIDGET_CLIENT_PATH = '/widget/client.jsx';
 const REACT_CDN = 'https://unpkg.com/react@18/umd/react.development.js';
 const REACT_DOM_CDN = 'https://unpkg.com/react-dom@18/umd/react-dom.development.js';
@@ -19,8 +19,8 @@ function renderWidgetShell(options = {}) {
   }
 
   return [
-    `<section data-widget-id="${WIDGET_ID}" data-widget-size="${WIDGET_SIZE}" class="p-6">`,
-    '  <div class="bg-slate-800 rounded-xl shadow-lg p-6 text-slate-100">',
+    `<section data-widget-id="${WIDGET_ID}" data-widget-size="${WIDGET_SIZE}" class="col-span-1">`,
+    '  <div class="bg-slate-800 rounded-xl shadow-lg p-6 text-slate-100 space-y-6">',
     `    <div ${rootAttributes.join(' ')}></div>`,
     '  </div>',
     '</section>',

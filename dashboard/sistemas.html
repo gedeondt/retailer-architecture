@@ -36,25 +36,24 @@
             </div>
             <span class="text-xs uppercase tracking-wide text-slate-500">Observabilidad</span>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <article class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-              <h3 class="text-base font-semibold mb-2">Bus de eventos</h3>
-              <p class="text-sm text-slate-600">
-                Estado de tópicos, latencia promedio y última actividad registrada.
-              </p>
-              <div class="mt-4 text-xs text-slate-500">
-                Permite que los microfronts identifiquen la salud de las integraciones.
-              </div>
-            </article>
-            <article class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-              <h3 class="text-base font-semibold mb-2">Analítica unificada</h3>
-              <p class="text-sm text-slate-600">
-                Widgets para tableros ejecutivos con métricas agregadas entre dominios.
-              </p>
-              <div class="mt-4 text-xs text-slate-500">
-                Representa microfronts de sistemas transversales reutilizables.
-              </div>
-            </article>
+          <div
+            class="grid grid-cols-1 xl:grid-cols-4 gap-6 auto-rows-[minmax(220px,_1fr)]"
+            id="sistemas-widgets-grid"
+          >
+            <div
+              id="nosql-db-widget-slot"
+              class="col-span-1"
+              data-widget-origin="http://127.0.0.1:4100"
+              data-api-origin="http://127.0.0.1:4100"
+              role="status"
+              aria-live="polite"
+            >
+              <article
+                class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex items-center justify-center"
+              >
+                <p class="text-sm text-slate-500">Cargando widget NoSQL…</p>
+              </article>
+            </div>
           </div>
         </section>
       </main>
@@ -65,5 +64,60 @@
         </div>
       </footer>
     </div>
+    <script type="module">
+      async function mountNosqlWidget() {
+        const slot = document.getElementById('nosql-db-widget-slot');
+        if (!slot) {
+          return;
+        }
+
+        const widgetOrigin = slot.dataset.widgetOrigin || 'http://127.0.0.1:4100';
+        const apiOrigin = slot.dataset.apiOrigin || widgetOrigin;
+
+        try {
+          const widgetUrl = new URL('/widget', widgetOrigin);
+          if (apiOrigin) {
+            widgetUrl.searchParams.set('apiOrigin', apiOrigin);
+          }
+
+          const response = await fetch(widgetUrl);
+          if (!response.ok) {
+            throw new Error(`estado ${response.status}`);
+          }
+
+          const html = await response.text();
+          const template = document.createElement('template');
+          template.innerHTML = html.trim();
+          const fragment = template.content;
+
+          const scripts = [...fragment.querySelectorAll('script')];
+          for (const script of scripts) {
+            const replacement = document.createElement('script');
+            for (const attr of script.attributes) {
+              let value = attr.value;
+              if (attr.name === 'src' && value && !/^https?:/i.test(value)) {
+                value = new URL(value, widgetOrigin).toString();
+              }
+              replacement.setAttribute(attr.name, value);
+            }
+            if (script.textContent) {
+              replacement.textContent = script.textContent;
+            }
+            script.replaceWith(replacement);
+          }
+
+          slot.replaceWith(fragment);
+        } catch (error) {
+          slot.innerHTML = `
+            <article class="bg-white rounded-xl border border-rose-300/60 shadow-sm p-6">
+              <h3 class="text-base font-semibold text-rose-600 mb-2">Widget NoSQL no disponible</h3>
+              <p class="text-sm text-rose-500">No se pudo cargar el microfrontend (${error.message}).</p>
+            </article>
+          `;
+        }
+      }
+
+      mountNosqlWidget();
+    </script>
   </body>
 </html>
