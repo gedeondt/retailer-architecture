@@ -22,4 +22,4 @@ Gestiona la experiencia de compra digital: navegación, carrito, pricing, promoc
 
 ## Modelo de entidades
 - [Entidades del dominio de Ventas Digitales](entities.md)
-
+- [Eventos publicados](events.md)
