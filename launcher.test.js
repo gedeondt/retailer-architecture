@@ -69,3 +69,32 @@ test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
   const payload = await response.json();
   assert.deepEqual(payload, { items: [], totalCollections: 0 });
 });
+
+test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
+  const { url, close } = await startLauncher({ startSystems: false });
+  t.after(close);
+
+  assert.match(url, /:3000\//);
+});
+
+test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-'));
+  const { close, systems } = await startLauncher({
+    port: 0,
+    systemsConfig: {
+      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: tempDir },
+    },
+  });
+
+  t.after(async () => {
+    await close();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  assert.ok(systems.nosql, 'se obtiene la instancia del servicio NoSQL');
+
+  const response = await fetch(new URL('/collections', systems.nosql.url));
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload, { items: [], totalCollections: 0 });
+});
