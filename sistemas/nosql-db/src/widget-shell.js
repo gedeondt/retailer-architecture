@@ -3,9 +3,6 @@
 const WIDGET_ID = 'sistemas-nosql-db';
 const WIDGET_SIZE = '1';
 const WIDGET_CLIENT_PATH = '/widget/client.jsx';
-const REACT_CDN = 'https://unpkg.com/react@18/umd/react.development.js';
-const REACT_DOM_CDN = 'https://unpkg.com/react-dom@18/umd/react-dom.development.js';
-const BABEL_CDN = 'https://unpkg.com/@babel/standalone@7/babel.min.js';
 
 function escapeAttribute(value) {
   return String(value).replace(/"/g, '&quot;');
@@ -24,9 +21,6 @@ function renderWidgetShell(options = {}) {
     `    <div ${rootAttributes.join(' ')}></div>`,
     '  </div>',
     '</section>',
-    `<script src="${REACT_CDN}" crossorigin="anonymous"></script>`,
-    `<script src="${REACT_DOM_CDN}" crossorigin="anonymous"></script>`,
-    `<script src="${BABEL_CDN}" crossorigin="anonymous"></script>`,
     `<script type="text/babel" data-presets="react" src="${WIDGET_CLIENT_PATH}"></script>`,
   ].join('\n');
 }
@@ -34,9 +28,6 @@ function renderWidgetShell(options = {}) {
 module.exports = {
   renderWidgetShell,
   WIDGET_CLIENT_PATH,
-  REACT_CDN,
-  REACT_DOM_CDN,
-  BABEL_CDN,
   escapeAttribute,
 };
 

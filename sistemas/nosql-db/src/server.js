@@ -50,21 +50,48 @@ async function readRequestBody(req) {
   }
 }
 
-function sendJson(res, statusCode, payload) {
+function sendJson(res, statusCode, payload, headers = {}) {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
+    ...headers,
   });
   res.end(body);
 }
 
-function sendText(res, statusCode, text, contentType = 'text/plain; charset=utf-8') {
+function sendText(res, statusCode, text, contentType = 'text/plain; charset=utf-8', headers = {}) {
   res.writeHead(statusCode, {
     'Content-Type': contentType,
     'Content-Length': Buffer.byteLength(text),
+    ...headers,
   });
   res.end(text);
+}
+
+function sendNoContent(res, headers = {}) {
+  res.writeHead(204, headers);
+  res.end();
+}
+
+function createCorsHeaders(req) {
+  const origin = req.headers?.origin;
+  const allowedOrigin = origin && origin !== 'null' ? origin : '*';
+  const headers = {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+  if (origin && origin !== 'null') {
+    headers.Vary = 'Origin';
+  }
+
+  const requestedHeaders = req.headers?.['access-control-request-headers'];
+  if (requestedHeaders) {
+    headers['Access-Control-Allow-Headers'] = requestedHeaders;
+  }
+
+  return headers;
 }
 
 function extractCollectionParams(pathname) {
@@ -75,23 +102,28 @@ function extractCollectionParams(pathname) {
   return segments.slice(1);
 }
 
-async function handleRequest(req, res, store, assets) {
+async function handleRequest(req, res, store, assets, corsHeaders) {
+  if (req.method === 'OPTIONS') {
+    sendNoContent(res, corsHeaders);
+    return;
+  }
+
   if (req.method === 'GET' && req.url) {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/widget') {
       const apiOrigin = url.searchParams.get('apiOrigin') || undefined;
-      sendText(res, 200, renderWidgetShell({ apiOrigin }), 'text/html; charset=utf-8');
+      sendText(res, 200, renderWidgetShell({ apiOrigin }), 'text/html; charset=utf-8', corsHeaders);
       return;
     }
 
     if (url.pathname === WIDGET_CLIENT_PATH) {
-      sendText(res, 200, assets.widgetClientScript, 'text/javascript; charset=utf-8');
+      sendText(res, 200, assets.widgetClientScript, 'text/plain; charset=utf-8', corsHeaders);
       return;
     }
 
     if (url.pathname === '/collections') {
       const summaries = store.getCollectionSummaries();
-      sendJson(res, 200, { items: summaries, totalCollections: summaries.length });
+      sendJson(res, 200, { items: summaries, totalCollections: summaries.length }, corsHeaders);
       return;
     }
   }
@@ -101,7 +133,7 @@ async function handleRequest(req, res, store, assets) {
     if (url.pathname === '/collections') {
       const body = await readRequestBody(req);
       const collection = await store.createCollection(body);
-      sendJson(res, 201, collection);
+      sendJson(res, 201, collection, corsHeaders);
       return;
     }
   }
@@ -121,33 +153,33 @@ async function handleRequest(req, res, store, assets) {
   if (req.method === 'POST' && action === 'items' && !maybeId) {
     const body = await readRequestBody(req);
     const result = await store.addItem(collectionName, body);
-    sendJson(res, 201, result);
+    sendJson(res, 201, result, corsHeaders);
     return;
   }
 
   if (req.method === 'GET' && action === 'items' && !maybeId) {
     const { page, pageSize } = parsePagination(url.searchParams.get('page'), url.searchParams.get('pageSize'));
     const result = await store.listItems(collectionName, { page, pageSize });
-    sendJson(res, 200, result);
+    sendJson(res, 200, result, corsHeaders);
     return;
   }
 
   if (req.method === 'GET' && action === 'items' && maybeId) {
     const result = await store.getItem(collectionName, maybeId);
-    sendJson(res, 200, result);
+    sendJson(res, 200, result, corsHeaders);
     return;
   }
 
   if (req.method === 'PUT' && action === 'items' && maybeId) {
     const body = await readRequestBody(req);
     const result = await store.updateItem(collectionName, maybeId, body);
-    sendJson(res, 200, result);
+    sendJson(res, 200, result, corsHeaders);
     return;
   }
 
   if (req.method === 'DELETE' && action === 'items' && maybeId) {
     const result = await store.deleteItem(collectionName, maybeId);
-    sendJson(res, 200, result);
+    sendJson(res, 200, result, corsHeaders);
     return;
   }
 
@@ -155,7 +187,7 @@ async function handleRequest(req, res, store, assets) {
     const query = url.searchParams.get('query');
     const { page, pageSize } = parsePagination(url.searchParams.get('page'), url.searchParams.get('pageSize'));
     const result = await store.searchItems(collectionName, query, { page, pageSize });
-    sendJson(res, 200, result);
+    sendJson(res, 200, result, corsHeaders);
     return;
   }
 
@@ -176,18 +208,19 @@ async function startNosqlService(options = {}) {
   const widgetClientScript = await fs.readFile(widgetClientPath, 'utf8');
 
   const server = http.createServer((req, res) => {
-    Promise.resolve(handleRequest(req, res, store, { widgetClientScript }))
+    const corsHeaders = createCorsHeaders(req);
+    Promise.resolve(handleRequest(req, res, store, { widgetClientScript }, corsHeaders))
       .catch((error) => {
         if (error instanceof HttpError) {
-          sendJson(res, error.statusCode, { message: error.message });
+          sendJson(res, error.statusCode, { message: error.message }, corsHeaders);
           return;
         }
         if (error instanceof CollectionError) {
-          sendJson(res, error.status, { message: error.message });
+          sendJson(res, error.status, { message: error.message }, corsHeaders);
           return;
         }
         console.error('Error inesperado en la API NoSQL', error);
-        sendJson(res, 500, { message: 'Error interno del servidor' });
+        sendJson(res, 500, { message: 'Error interno del servidor' }, corsHeaders);
       })
       .finally(() => {
         if (!res.writableEnded) {
