@@ -118,7 +118,7 @@ async function mountWidget(options) {
   const apiOrigin = widgetConfig.apiOrigin || slot.dataset.apiOrigin || defaultApiOrigin || widgetOrigin;
 
   try {
-    const widgetUrl = new URL('/widget', widgetOrigin);
+    const widgetUrl = new URL('widget', widgetOrigin);
     if (apiOrigin) {
       widgetUrl.searchParams.set('apiOrigin', apiOrigin);
     }

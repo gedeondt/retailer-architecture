@@ -33,6 +33,19 @@
             </span>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[minmax(160px,_1fr)]">
+            <div
+              id="ventasdigitales-ecommerce-widget-slot"
+              class="col-span-1 sm:col-span-2 xl:col-span-2"
+              role="status"
+              aria-live="polite"
+            >
+              <article
+                class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex items-center justify-center"
+              >
+                <p class="text-sm text-slate-500">Cargando widget Ecommerce…</p>
+              </article>
+            </div>
+
             <article class="col-span-1 bg-slate-50 rounded-xl border border-slate-200 p-6">
               <h3 class="text-base font-semibold mb-2">Ventas Digitales</h3>
               <p class="text-sm text-slate-600">
@@ -75,5 +88,7 @@
 
       <div data-dashboard-include="footer"></div>
     </div>
+
+    <script type="module" src="/dashboard/scripts/dominios-page.js"></script>
   </body>
 </html>
