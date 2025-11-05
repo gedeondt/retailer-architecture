@@ -5,7 +5,7 @@ if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
 const { useEffect, useMemo, useRef, useState } = React;
 const { createRoot } = ReactDOM;
 
-const REFRESH_INTERVAL_MS = 10_000;
+const REFRESH_INTERVAL_MS = 20_000;
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -15,6 +15,20 @@ function formatThroughput(value) {
   return `${value.toFixed(2)} req/s`;
 }
 
+function formatBytes(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = typeof bytes === 'number' && Number.isFinite(bytes) ? bytes : 0;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const decimals = value >= 10 || unitIndex === 0 ? 1 : 2;
+  return `${value.toFixed(decimals)} ${units[unitIndex]}`;
+}
+
 function WidgetHeader({ onReload, isLoading, totalCollections }) {
   const subtitle = totalCollections === 1 ? '1 colección registrada' : `${totalCollections} colecciones registradas`;
   return (
@@ -22,7 +36,7 @@ function WidgetHeader({ onReload, isLoading, totalCollections }) {
       <div>
         <h1 className="text-2xl font-semibold">Colecciones NoSQL</h1>
         <p className="text-sm text-slate-300">
-          Resumen de colecciones, tamaño y throughput en los últimos 10 segundos.
+          Resumen de colecciones, tamaño y throughput con actualización automática.
         </p>
         <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
       </div>
@@ -85,8 +99,43 @@ function resolveApiBase(container) {
   return window.location.origin;
 }
 
+function StorageUsageBar({ storage, isLoading }) {
+  if (!storage) {
+    return null;
+  }
+
+  const limitBytes = typeof storage.limitBytes === 'number' ? storage.limitBytes : 0;
+  const usedBytes = typeof storage.usedBytes === 'number' ? storage.usedBytes : 0;
+  const freeBytes = typeof storage.freeBytes === 'number' ? storage.freeBytes : Math.max(0, limitBytes - usedBytes);
+  const ratio = limitBytes > 0 ? usedBytes / limitBytes : 0;
+  const clampedRatio = Math.max(0, Math.min(1, ratio));
+  const percentage = clampedRatio * 100;
+  const width = `${percentage}%`;
+
+  return (
+    <section aria-label="Uso de almacenamiento" className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-slate-300">Uso de almacenamiento</span>
+        <span className="text-slate-200 font-medium">
+          {formatBytes(usedBytes)} / {formatBytes(limitBytes)} ({percentage.toFixed(1)}%)
+        </span>
+      </div>
+      <div
+        className="h-3 bg-slate-700/70 rounded-full overflow-hidden"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(percentage)}
+      >
+        <div className="h-full bg-emerald-400 transition-[width] duration-500" style={{ width }} />
+      </div>
+      <p className="text-xs text-slate-400">{isLoading ? 'Actualizando uso…' : `${formatBytes(freeBytes)} libres`}</p>
+    </section>
+  );
+}
+
 function NosqlCollectionsWidget() {
-  const [state, setState] = useState({ status: 'loading', error: null, collections: [] });
+  const [state, setState] = useState({ status: 'loading', error: null, collections: [], storage: null });
   const loadRef = useRef(() => {});
   const container = document.getElementById('nosql-db-root');
   const apiBase = useMemo(() => resolveApiBase(container), [container]);
@@ -103,7 +152,7 @@ function NosqlCollectionsWidget() {
         throw new Error('No se pudo recuperar la información de colecciones');
       }
       const payload = await response.json();
-      return payload.items ?? [];
+      return payload;
     };
   }, [makeUrl]);
 
@@ -112,14 +161,19 @@ function NosqlCollectionsWidget() {
 
     const load = async () => {
       try {
-        const items = await fetchCollections();
+        const payload = await fetchCollections();
         if (!cancelled) {
-          setState({ status: 'ready', error: null, collections: items });
+          setState({
+            status: 'ready',
+            error: null,
+            collections: payload.items ?? [],
+            storage: payload.storage ?? null,
+          });
         }
       } catch (error) {
         if (!cancelled) {
           const message = error instanceof Error ? error.message : 'Error desconocido';
-          setState({ status: 'error', error: message, collections: [] });
+          setState({ status: 'error', error: message, collections: [], storage: null });
         }
       }
     };
@@ -140,6 +194,7 @@ function NosqlCollectionsWidget() {
   return (
     <div className="space-y-4">
       <WidgetHeader onReload={() => loadRef.current?.()} isLoading={isLoading} totalCollections={totalCollections} />
+      <StorageUsageBar storage={state.storage} isLoading={isLoading} />
       {state.error ? <ErrorMessage message={state.error} /> : null}
       <CollectionsGrid collections={state.collections} />
     </div>

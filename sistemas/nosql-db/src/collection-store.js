@@ -6,6 +6,7 @@ const { randomUUID } = require('node:crypto');
 
 const MAX_BODY_SIZE_BYTES = 1024 * 1024;
 const THROUGHPUT_WINDOW_MS = 10_000;
+const DEFAULT_MAX_STORAGE_BYTES = 10 * 1024 * 1024;
 
 class CollectionError extends Error {
   constructor(message, status = 400) {
@@ -59,14 +60,20 @@ function parsePagination(page, pageSize) {
   return { page: parsedPage, pageSize: parsedSize };
 }
 
+function getByteLength(value) {
+  return Buffer.byteLength(value, 'utf8');
+}
+
 class CollectionStore {
-  constructor({ baseDir, now = () => Date.now() }) {
+  constructor({ baseDir, now = () => Date.now(), maxStorageBytes = DEFAULT_MAX_STORAGE_BYTES }) {
     if (!baseDir) {
       throw new Error('baseDir es obligatorio');
     }
     this.baseDir = baseDir;
     this.collections = new Map();
     this.now = now;
+    this.maxStorageBytes = maxStorageBytes;
+    this.currentStorageBytes = 0;
   }
 
   async initialize() {
@@ -78,6 +85,7 @@ class CollectionStore {
         .map((entry) => fs.rm(path.join(this.baseDir, entry.name), { recursive: true, force: true })),
     );
     this.collections.clear();
+    this.currentStorageBytes = 0;
   }
 
   async createCollection({ name, indexField }) {
@@ -126,6 +134,17 @@ class CollectionStore {
     }
   }
 
+  ensureStorageCapacity(additionalBytes) {
+    if (additionalBytes <= 0) {
+      return;
+    }
+
+    const projected = this.currentStorageBytes + additionalBytes;
+    if (projected > this.maxStorageBytes) {
+      throw new CollectionError('Se alcanzó el límite de almacenamiento disponible', 507);
+    }
+  }
+
   async addItem(collectionName, payload) {
     const collection = this.getCollection(collectionName);
     ensureObject(payload, 'Solo se aceptan objetos JSON para almacenar');
@@ -137,7 +156,11 @@ class CollectionStore {
     const id = randomUUID();
     const itemPath = path.join(collection.dir, `${id}.json`);
     const serialized = JSON.stringify(payload, null, 2);
+    const size = getByteLength(serialized);
+
+    this.ensureStorageCapacity(size);
     await fs.writeFile(itemPath, serialized, 'utf8');
+    this.currentStorageBytes += size;
 
     this.updateIndexForInsert(collection, id, payload);
     collection.itemCount += 1;
@@ -204,9 +227,12 @@ class CollectionStore {
 
     const itemPath = path.join(collection.dir, `${id}.json`);
     const serialized = JSON.stringify(payload, null, 2);
+    const nextSize = getByteLength(serialized);
+    let previousSize = 0;
 
     try {
-      await fs.access(itemPath);
+      const stats = await fs.stat(itemPath);
+      previousSize = stats.size;
     } catch (error) {
       if (error.code === 'ENOENT') {
         throw new CollectionError('El elemento solicitado no existe', 404);
@@ -214,7 +240,13 @@ class CollectionStore {
       throw error;
     }
 
+    const delta = nextSize - previousSize;
+    this.ensureStorageCapacity(delta);
     await fs.writeFile(itemPath, serialized, 'utf8');
+    this.currentStorageBytes += delta;
+    if (this.currentStorageBytes < 0) {
+      this.currentStorageBytes = 0;
+    }
     this.updateIndexForUpdate(collection, id, payload);
     this.recordOperation(collection);
 
@@ -224,8 +256,11 @@ class CollectionStore {
   async deleteItem(collectionName, id) {
     const collection = this.getCollection(collectionName);
     const itemPath = path.join(collection.dir, `${id}.json`);
+    let reclaimed = 0;
 
     try {
+      const stats = await fs.stat(itemPath);
+      reclaimed = stats.size;
       await fs.rm(itemPath);
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -234,6 +269,9 @@ class CollectionStore {
       throw error;
     }
 
+    if (reclaimed > 0) {
+      this.currentStorageBytes = Math.max(0, this.currentStorageBytes - reclaimed);
+    }
     const key = collection.keyById.get(id);
     if (key) {
       const bucket = collection.index.get(key);
@@ -330,6 +368,13 @@ class CollectionStore {
         };
       });
   }
+
+  getStorageStats() {
+    const usedBytes = Math.max(0, this.currentStorageBytes);
+    const limitBytes = this.maxStorageBytes;
+    const freeBytes = Math.max(0, limitBytes - usedBytes);
+    return { limitBytes, usedBytes, freeBytes };
+  }
 }
 
 module.exports = {
@@ -337,4 +382,5 @@ module.exports = {
   CollectionError,
   parsePagination,
   normalizeIndexKey,
+  DEFAULT_MAX_STORAGE_BYTES,
 };

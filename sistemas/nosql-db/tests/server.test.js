@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { startNosqlService, renderWidgetShell } = require('../src/server');
+const { CollectionStore } = require('../src/collection-store');
 
 async function createTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -85,12 +86,53 @@ test('startNosqlService expone la API CRUD y de búsqueda', async (t) => {
   assert.equal(summary.totalCollections, 1);
   assert.equal(summary.items[0].name, 'clientes');
   assert.equal(summary.items[0].itemCount, 0);
+  assert(summary.storage);
+  assert.equal(summary.storage.limitBytes > 0, true);
+  assert.equal(summary.storage.usedBytes >= 0, true);
 
   response = await fetch(new URL('/widget/client.jsx', url));
   assert.equal(response.status, 200);
   const widgetSource = await response.text();
   assert.match(widgetSource, /const \{ useEffect, useMemo, useRef, useState \} = React;/);
   assert.match(widgetSource, /root\.render\(<NosqlCollectionsWidget \/>\);/);
+});
+
+test('la API rechaza inserciones cuando se supera el límite de almacenamiento', async (t) => {
+  const tempDir = await createTempDir('nosql-server-capacity-');
+  const store = new CollectionStore({ baseDir: path.join(tempDir, 'data'), maxStorageBytes: 700 });
+  const { url, close } = await startNosqlService({ port: 0, dataDir: tempDir, store });
+
+  t.after(async () => {
+    await close();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  let response = await fetch(new URL('/collections', url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'binarios', indexField: 'clave' }),
+  });
+  assert.equal(response.status, 201);
+
+  response = await fetch(new URL('/collections/binarios/items', url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ clave: 'primero', contenido: 'x'.repeat(200) }),
+  });
+  assert.equal(response.status, 201);
+
+  response = await fetch(new URL('/collections/binarios/items', url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ clave: 'segundo', contenido: 'y'.repeat(600) }),
+  });
+  assert.equal(response.status, 507);
+  const failure = await response.json();
+  assert.match(failure.message, /límite de almacenamiento/i);
+
+  response = await fetch(new URL('/collections', url));
+  const summary = await response.json();
+  assert(summary.storage.usedBytes <= summary.storage.limitBytes);
 });
 
 test('la API expone cabeceras CORS y responde preflight', async (t) => {
