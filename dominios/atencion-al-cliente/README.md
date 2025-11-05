@@ -16,5 +16,3 @@ Resuelve consultas, incidencias y reclamaciones de clientes a lo largo del ciclo
 ## Historias de usuario
 1. Como **agente del contact center** quiero ver el historial completo del pedido para brindar respuestas consistentes al cliente.
 2. Como **cliente** quiero iniciar una reclamación por producto dañado desde el portal de ayuda para obtener una solución rápida.
-3. Como **supervisor de atención** quiero monitorear los SLA de casos abiertos para priorizar aquellos que afectan entregas críticas.
-4. Como **especialista de procesos** quiero etiquetar los casos recurrentes para proponer mejoras a los demás dominios.
