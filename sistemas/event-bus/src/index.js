@@ -1,6 +1,8 @@
 'use strict';
 
 const { SimpleEventLog, EventConsumer } = require('./event-log');
+const { startEventBusService } = require('./server');
+const { renderWidgetShell, WIDGET_CLIENT_PATH, WIDGET_ID, WIDGET_SIZE, ROOT_ID } = require('./widget-shell');
 
 function createEventLog(options) {
   return new SimpleEventLog(options);
@@ -27,19 +29,21 @@ module.exports = {
   EventConsumer,
   createEventLog,
   startEventBus,
+  startEventBusService,
+  renderWidgetShell,
+  WIDGET_CLIENT_PATH,
+  WIDGET_ID,
+  WIDGET_SIZE,
+  ROOT_ID,
 };
 
 if (require.main === module) {
-  (async () => {
-    const { log } = await startEventBus();
-    const message = [
-      'Event bus inicializado.',
-      `Directorio de datos: ${log.dataDir}`,
-      'Utiliza require("@retailer/sistemas-event-bus") para interactuar con la cola.',
-    ].join('\n');
-    console.log(message);
-  })().catch((error) => {
-    console.error('Error al inicializar el event bus', error);
-    process.exitCode = 1;
-  });
+  startEventBusService()
+    .then(({ url }) => {
+      console.log(`Servicio Event Bus disponible en ${url}`);
+    })
+    .catch((error) => {
+      console.error('No se pudo iniciar el Event Bus', error);
+      process.exitCode = 1;
+    });
 }

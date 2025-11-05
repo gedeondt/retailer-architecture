@@ -39,3 +39,28 @@ test('startEventBus inicializa y devuelve un manejador con método close', async
   const events = await service.log.listEvents();
   assert.equal(events.length, 0);
 });
+
+test('startEventBusService levanta el servidor HTTP y expone la URL', async (t) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-bus-http-'));
+  const service = await api.startEventBusService({ dataDir: tempDir, port: 0 });
+  t.after(async () => {
+    await service.close();
+  });
+  t.after(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  assert.ok(service.url.startsWith('http://'));
+  assert.ok(service.log instanceof api.SimpleEventLog);
+
+  const response = await fetch(`${service.url}/events`);
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload.items, []);
+});
+
+test('renderWidgetShell genera un fragmento HTML válido', () => {
+  const html = api.renderWidgetShell({ apiOrigin: 'http://localhost:9999' });
+  assert.ok(html.includes('data-widget-id="sistemas-event-bus"'));
+  assert.ok(html.includes('data-api-origin="http://localhost:9999"'));
+});
