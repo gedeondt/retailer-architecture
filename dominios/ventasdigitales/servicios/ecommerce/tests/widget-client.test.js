@@ -14,4 +14,7 @@ test('el cliente del widget define los productos base y la estructura del evento
   assert.equal(productOccurrences, 4, 'contiene exactamente cuatro productos predeterminados');
   assert.match(source, /name:\s*'OrderConfirmed'/, 'prepara el evento OrderConfirmed');
   assert.match(source, /createRoot\(container\)/, 'monta el widget utilizando ReactDOM.createRoot');
+  assert.match(source, /customerFirstName/, 'solicita el nombre del cliente');
+  assert.match(source, /paymentCardNumber/, 'solicita los datos de tarjeta para el pago');
+  assert.ok(!/orderId/.test(source), 'no requiere ingresar manualmente el identificador del pedido');
 });

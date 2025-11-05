@@ -35,6 +35,13 @@
 
   const DEFAULT_CURRENCY = 'EUR';
 
+  const CARD_BRAND_PATTERNS = [
+    { pattern: /^4/, brand: 'visa' },
+    { pattern: /^5[1-5]/, brand: 'mastercard' },
+    { pattern: /^3[47]/, brand: 'amex' },
+    { pattern: /^6(?:011|5)/, brand: 'discover' },
+  ];
+
   function formatCurrency(value, currency) {
     try {
       return new Intl.NumberFormat('es-ES', {
@@ -45,6 +52,65 @@
     } catch (_error) {
       return `${value.toFixed(2)} ${currency}`;
     }
+  }
+
+  function normalizeString(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  function sanitizeCardNumber(number) {
+    const digits = typeof number === 'string' ? number.replace(/\D+/g, '') : '';
+    if (!digits) {
+      return { digits: '', last4: null };
+    }
+    return {
+      digits,
+      last4: digits.slice(-4),
+    };
+  }
+
+  function detectCardBrand(digits) {
+    if (!digits) {
+      return null;
+    }
+    const found = CARD_BRAND_PATTERNS.find((entry) => entry.pattern.test(digits));
+    return found ? found.brand : 'unknown';
+  }
+
+  function parseExpiry(value) {
+    if (typeof value !== 'string') {
+      return { month: null, year: null };
+    }
+    const match = value.trim().match(/^(\d{1,2})(?:\s*\/\s*(\d{2,4}))?$/);
+    if (!match) {
+      return { month: null, year: null };
+    }
+
+    let month = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(month) || month < 1 || month > 12) {
+      month = null;
+    } else {
+      month = String(month).padStart(2, '0');
+    }
+
+    let year = null;
+    if (match[2]) {
+      year = Number.parseInt(match[2], 10);
+      if (Number.isFinite(year)) {
+        if (year < 100) {
+          year += 2000;
+        }
+        year = String(year);
+      } else {
+        year = null;
+      }
+    }
+
+    return { month, year };
   }
 
   function clampQuantity(value) {
@@ -75,9 +141,14 @@
 
   function useCheckoutForm() {
     const [formData, setFormData] = useState({
-      orderId: '',
-      customerId: '',
-      paymentId: '',
+      customerFirstName: '',
+      customerLastName: '',
+      customerEmail: '',
+      customerPhone: '',
+      paymentCardHolder: '',
+      paymentCardNumber: '',
+      paymentCardExpiry: '',
+      paymentCardCvv: '',
       currency: DEFAULT_CURRENCY,
       confirmedAt: new Date().toISOString().slice(0, 16),
     });
@@ -115,12 +186,31 @@
       }
     }
 
+    const sanitizedCard = sanitizeCardNumber(formData.paymentCardNumber);
+    const { month: expiryMonth, year: expiryYear } = parseExpiry(formData.paymentCardExpiry);
+    const cardBrand = detectCardBrand(sanitizedCard.digits);
+    const securityCodeProvided = Boolean(normalizeString(formData.paymentCardCvv));
+
     return {
       name: 'OrderConfirmed',
       payload: {
-        orderId: formData.orderId || '',
-        customerId: formData.customerId || '',
-        paymentId: formData.paymentId || '',
+        customer: {
+          firstName: normalizeString(formData.customerFirstName),
+          lastName: normalizeString(formData.customerLastName),
+          email: normalizeString(formData.customerEmail),
+          phone: normalizeString(formData.customerPhone),
+        },
+        payment: {
+          method: 'credit_card',
+          card: {
+            holderName: normalizeString(formData.paymentCardHolder),
+            last4: sanitizedCard.last4,
+            brand: cardBrand,
+            expiryMonth,
+            expiryYear,
+          },
+          securityCodeProvided,
+        },
         items: items.map((item) => ({
           sku: item.sku,
           quantity: item.quantity,
@@ -188,15 +278,28 @@
     );
   }
 
-  function TextInput({ id, value, onChange, placeholder, autoComplete }) {
+  function TextInput({
+    id,
+    value,
+    onChange,
+    placeholder,
+    autoComplete,
+    type = 'text',
+    inputMode,
+    maxLength,
+    pattern,
+  }) {
     return (
       <input
         id={id}
-        type="text"
+        type={type}
         value={value}
         autoComplete={autoComplete}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        pattern={pattern}
         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/60"
       />
     );
@@ -231,68 +334,136 @@
 
   function OrderForm({ formData, onFieldChange }) {
     return (
-      <div className="space-y-4">
-        <Field
-          label="Identificador del pedido"
-          id="order-id-input"
-          description="UUID o folio interno del pedido confirmado."
-        >
-          <TextInput
-            id="order-id-input"
-            value={formData.orderId}
-            onChange={(value) => onFieldChange('orderId', value)}
-            placeholder="00000000-0000-0000-0000-000000000000"
-            autoComplete="off"
-          />
-        </Field>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <header className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wide">Cliente</h3>
+            <p className="text-xs text-slate-500">
+              Datos básicos para crear el cliente durante el checkout.
+            </p>
+          </header>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Nombre" id="customer-first-name" description="Nombre del titular de la cuenta.">
+              <TextInput
+                id="customer-first-name"
+                value={formData.customerFirstName}
+                onChange={(value) => onFieldChange('customerFirstName', value)}
+                placeholder="Ana"
+                autoComplete="given-name"
+              />
+            </Field>
+            <Field label="Apellidos" id="customer-last-name">
+              <TextInput
+                id="customer-last-name"
+                value={formData.customerLastName}
+                onChange={(value) => onFieldChange('customerLastName', value)}
+                placeholder="Pérez"
+                autoComplete="family-name"
+              />
+            </Field>
+            <Field label="Correo electrónico" id="customer-email">
+              <TextInput
+                id="customer-email"
+                type="email"
+                value={formData.customerEmail}
+                onChange={(value) => onFieldChange('customerEmail', value)}
+                placeholder="ana@example.com"
+                autoComplete="email"
+              />
+            </Field>
+            <Field label="Teléfono" id="customer-phone">
+              <TextInput
+                id="customer-phone"
+                value={formData.customerPhone}
+                onChange={(value) => onFieldChange('customerPhone', value)}
+                placeholder="+34 600 000 000"
+                autoComplete="tel"
+                inputMode="tel"
+              />
+            </Field>
+          </div>
+        </div>
 
-        <Field
-          label="Cliente"
-          id="customer-id-input"
-          description="Identificador único del cliente en el CRM."
-        >
-          <TextInput
-            id="customer-id-input"
-            value={formData.customerId}
-            onChange={(value) => onFieldChange('customerId', value)}
-            placeholder="Cliente UUID"
-            autoComplete="off"
-          />
-        </Field>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <header className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wide">Pago</h3>
+            <p className="text-xs text-slate-500">
+              Información de tarjeta necesaria para autorizar el cobro.
+            </p>
+          </header>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Titular" id="card-holder">
+              <TextInput
+                id="card-holder"
+                value={formData.paymentCardHolder}
+                onChange={(value) => onFieldChange('paymentCardHolder', value)}
+                placeholder="Ana Pérez"
+                autoComplete="cc-name"
+              />
+            </Field>
+            <Field label="Número de tarjeta" id="card-number" description="Solo se almacenarán los últimos 4 dígitos.">
+              <TextInput
+                id="card-number"
+                value={formData.paymentCardNumber}
+                onChange={(value) => onFieldChange('paymentCardNumber', value)}
+                placeholder="4242 4242 4242 4242"
+                autoComplete="cc-number"
+                inputMode="numeric"
+                maxLength={23}
+              />
+            </Field>
+            <Field label="Vencimiento" id="card-expiry" description="Formato MM/AA.">
+              <TextInput
+                id="card-expiry"
+                value={formData.paymentCardExpiry}
+                onChange={(value) => onFieldChange('paymentCardExpiry', value)}
+                placeholder="04/28"
+                autoComplete="cc-exp"
+                pattern="\d{2}\s*/\s*\d{2,4}"
+                inputMode="numeric"
+                maxLength={7}
+              />
+            </Field>
+            <Field label="CVV" id="card-cvv" description="No se persiste, solo valida la captura.">
+              <TextInput
+                id="card-cvv"
+                value={formData.paymentCardCvv}
+                onChange={(value) => onFieldChange('paymentCardCvv', value)}
+                placeholder="123"
+                autoComplete="cc-csc"
+                inputMode="numeric"
+                maxLength={4}
+              />
+            </Field>
+          </div>
+        </div>
 
-        <Field
-          label="Pago"
-          id="payment-id-input"
-          description="Referencia del cobro autorizado o capturado."
-        >
-          <TextInput
-            id="payment-id-input"
-            value={formData.paymentId}
-            onChange={(value) => onFieldChange('paymentId', value)}
-            placeholder="Pago UUID"
-            autoComplete="off"
-          />
-        </Field>
-
-        <Field label="Moneda" id="currency-select">
-          <CurrencySelect
-            id="currency-select"
-            value={formData.currency}
-            onChange={(value) => onFieldChange('currency', value)}
-          />
-        </Field>
-
-        <Field
-          label="Confirmado"
-          id="confirmed-at-input"
-          description="Fecha y hora en que se completó el checkout."
-        >
-          <DateInput
-            id="confirmed-at-input"
-            value={formData.confirmedAt}
-            onChange={(value) => onFieldChange('confirmedAt', value)}
-          />
-        </Field>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <header className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wide">Confirmación</h3>
+            <p className="text-xs text-slate-500">Detalles utilizados para generar el evento final.</p>
+          </header>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Moneda" id="currency-select">
+              <CurrencySelect
+                id="currency-select"
+                value={formData.currency}
+                onChange={(value) => onFieldChange('currency', value)}
+              />
+            </Field>
+            <Field
+              label="Confirmado"
+              id="confirmed-at-input"
+              description="Fecha y hora en que se completó el checkout."
+            >
+              <DateInput
+                id="confirmed-at-input"
+                value={formData.confirmedAt}
+                onChange={(value) => onFieldChange('confirmedAt', value)}
+              />
+            </Field>
+          </div>
+        </div>
       </div>
     );
   }
@@ -356,8 +527,8 @@
           </p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 py-6 flex-1">
-          <section className="lg:col-span-3 space-y-4">
+        <div className="py-6 flex-1 space-y-6">
+          <section className="space-y-4">
             <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Catálogo</h2>
             <ProductsGrid
               products={PRODUCTS}
@@ -367,13 +538,8 @@
             />
           </section>
 
-          <section className="lg:col-span-2 space-y-4">
-            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Datos del pedido</h2>
-              <OrderForm formData={formData} onFieldChange={updateField} />
-            </div>
-
-            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-5">
+          <section className="space-y-4">
+            <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5">
               <div>
                 <h2 className="text-sm font-semibold text-amber-700 uppercase tracking-wide">Resumen</h2>
                 <p className="text-xs text-amber-700/80">
@@ -382,6 +548,11 @@
               </div>
               <ItemsSummary items={items} currency={currency} />
             </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Datos del pedido</h2>
+            <OrderForm formData={formData} onFieldChange={updateField} />
           </section>
         </div>
 
