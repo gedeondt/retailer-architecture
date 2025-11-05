@@ -6,15 +6,21 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 
-const { startLauncher, createDashboardHTML } = require('./launcher');
+const { startLauncher, createDashboardHTML } = require('../src/server');
 
 test('createDashboardHTML lee la página principal desde el sistema de archivos', () => {
   const html = createDashboardHTML();
   assert.ok(html.includes('Panel maestro de microfrontends'), 'la cabecera del dashboard está presente');
   assert.ok(html.includes('data-widget-id="ventas-pedidos"'), 'incluye widget de pedidos');
   assert.ok(html.includes('data-widget-size="4"'), 'muestra widgets panorámicos de 4 columnas');
-  assert.ok(html.includes('href="/dominios.html"'), 'el menú enlaza a la página de dominios');
-  assert.ok(!html.includes('href="#dominios"'), 'el menú ya no usa anclas internas');
+  assert.ok(
+    html.includes('data-dashboard-include="header"'),
+    'incluye el marcador para insertar el header compartido',
+  );
+  assert.ok(
+    html.includes('data-dashboard-include="footer"'),
+    'incluye el marcador para insertar el footer reutilizable',
+  );
 });
 
 test('startLauncher sirve páginas independientes para cada sección', async (t) => {

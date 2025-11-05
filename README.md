@@ -66,12 +66,19 @@ El dashboard del launcher funciona como el punto de entrada visual para los micr
 
 ### Prueba de concepto inicial
 
-La raíz del repositorio incluye un `launcher.js` que levanta un servidor HTTP mínimo y sirve un dashboard de ejemplo con widgets simulados. El contenido HTML del dashboard vive en la carpeta [`dashboard/`](dashboard), donde se encuentran páginas independientes para **Inicio**, **Dominios** y **Sistemas**. Esta separación mantiene el lanzador ligero y permite navegar entre vistas completas sin recurrir a anclas.
+El dashboard se sirve ahora desde el paquete [`frontales/launcher-dashboard`](frontales/launcher-dashboard), un microproyecto con Express que arranca los sistemas transversales y entrega las páginas estáticas alojadas en [`dashboard/`](dashboard). El script raíz [`launcher.js`](launcher.js) delega en este paquete para mantener la compatibilidad con la experiencia existente.
 
-Para visualizarlo:
+Para visualizarlo desde la raíz del repositorio:
 
 ```bash
 node launcher.js
+```
+
+O bien, ejecutando el paquete dedicado:
+
+```bash
+cd frontales/launcher-dashboard
+npm start
 ```
 
 El comando imprimirá en consola la URL local del dashboard. Al abrirla en el navegador se podrá validar la composición visual del panel maestro y desplazarse entre las distintas páginas mediante los enlaces del menú superior.
