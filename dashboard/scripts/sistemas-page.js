@@ -12,6 +12,7 @@ function initSistemasWidgets() {
     slotId: 'event-bus-widget-slot',
     systemKey: 'eventBus',
     defaultWidgetOrigin: 'http://127.0.0.1:4200',
+    defaultChannel: 'general',
     errorTitle: 'Widget Event Bus no disponible',
   });
 }

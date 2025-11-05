@@ -104,7 +104,14 @@ async function bootstrapScript(script) {
 }
 
 async function mountWidget(options) {
-  const { slotId, systemKey, defaultWidgetOrigin, defaultApiOrigin, errorTitle } = options;
+  const {
+    slotId,
+    systemKey,
+    defaultWidgetOrigin,
+    defaultApiOrigin,
+    defaultChannel,
+    errorTitle,
+  } = options;
   const slot = document.getElementById(slotId);
   if (!slot) {
     return;
@@ -117,10 +124,15 @@ async function mountWidget(options) {
   const widgetOrigin = widgetConfig.widgetOrigin || slot.dataset.widgetOrigin || defaultWidgetOrigin;
   const apiOrigin = widgetConfig.apiOrigin || slot.dataset.apiOrigin || defaultApiOrigin || widgetOrigin;
 
+  const channel = widgetConfig.channel || slot.dataset.channel || defaultChannel;
+
   try {
     const widgetUrl = new URL('widget', widgetOrigin);
     if (apiOrigin) {
       widgetUrl.searchParams.set('apiOrigin', apiOrigin);
+    }
+    if (channel) {
+      widgetUrl.searchParams.set('channel', channel);
     }
 
     const response = await fetch(widgetUrl);

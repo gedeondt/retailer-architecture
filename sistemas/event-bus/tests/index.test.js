@@ -115,4 +115,10 @@ test('renderWidgetShell genera un fragmento HTML válido', () => {
   const html = api.renderWidgetShell({ apiOrigin: 'http://localhost:9999' });
   assert.ok(html.includes('data-widget-id="sistemas-event-bus"'));
   assert.ok(html.includes('data-api-origin="http://localhost:9999"'));
+  assert.ok(html.includes('data-channel="general"'));
+});
+
+test('renderWidgetShell permite configurar el canal objetivo del widget', () => {
+  const html = api.renderWidgetShell({ channel: 'ventas' });
+  assert.ok(html.includes('data-channel="ventas"'));
 });

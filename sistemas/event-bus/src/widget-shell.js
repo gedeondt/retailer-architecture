@@ -4,14 +4,19 @@ const WIDGET_ID = 'sistemas-event-bus';
 const WIDGET_SIZE = '2';
 const WIDGET_CLIENT_PATH = '/widget/client.jsx';
 const ROOT_ID = 'event-bus-root';
+const DEFAULT_CHANNEL = 'general';
 
 function escapeAttribute(value) {
   return String(value).replace(/"/g, '&quot;');
 }
 
 function renderWidgetShell(options = {}) {
-  const { apiOrigin } = options;
+  const { apiOrigin, channel } = options;
   const rootAttributes = [`id="${ROOT_ID}"`];
+
+  const resolvedChannel =
+    typeof channel === 'string' && channel.trim().length > 0 ? channel.trim() : DEFAULT_CHANNEL;
+  rootAttributes.push(`data-channel="${escapeAttribute(resolvedChannel)}"`);
 
   if (apiOrigin) {
     rootAttributes.push(`data-api-origin="${escapeAttribute(apiOrigin)}"`);
@@ -33,5 +38,6 @@ module.exports = {
   WIDGET_ID,
   WIDGET_SIZE,
   ROOT_ID,
+  DEFAULT_CHANNEL,
   escapeAttribute,
 };

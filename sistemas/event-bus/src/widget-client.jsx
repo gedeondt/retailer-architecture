@@ -21,6 +21,14 @@
     return window.location.origin;
   }
 
+  function resolveChannel(container) {
+    const provided = container?.dataset?.channel;
+    if (provided && provided.trim() !== '') {
+      return provided.trim();
+    }
+    return 'general';
+  }
+
   function formatTimestamp(isoString) {
     if (!isoString) {
       return '—';
@@ -46,19 +54,21 @@
     return type;
   }
 
-  function useOverviewLoader(apiBase) {
+  function useOverviewLoader(apiBase, channel) {
     const [state, setState] = useState({ status: 'loading', error: null, overview: null });
     const loadRef = useRef(() => {});
 
     const fetchOverview = useMemo(() => {
       return async () => {
-        const response = await fetch(new URL('/overview', apiBase));
+        const url = new URL('/overview', apiBase);
+        url.searchParams.set('channel', channel);
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error('No se pudo recuperar el estado del bus de eventos');
         }
         return response.json();
       };
-    }, [apiBase]);
+    }, [apiBase, channel]);
 
     useEffect(() => {
       let cancelled = false;
@@ -245,7 +255,8 @@
 
   function EventBusWidget({ container }) {
     const apiBase = useMemo(() => resolveApiBase(container), [container]);
-    const { state, reload } = useOverviewLoader(apiBase);
+    const channel = useMemo(() => resolveChannel(container), [container]);
+    const { state, reload } = useOverviewLoader(apiBase, channel);
 
     const overview = state.overview;
     const totalEvents = overview?.totalEvents ?? 0;
