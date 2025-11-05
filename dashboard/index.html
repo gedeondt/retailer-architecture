@@ -8,22 +8,16 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin="anonymous"></script>
+    <script type="module" src="/dashboard/scripts/dashboard-layout.js"></script>
   </head>
-  <body class="bg-slate-100 min-h-screen text-slate-900">
+  <body
+    class="bg-slate-100 min-h-screen text-slate-900"
+    data-dashboard-title="Panel maestro de microfrontends"
+    data-dashboard-section="inicio"
+    data-dashboard-footer="Launcher pensado para orquestar microfronts modulares con distribución en 1, 2 o 4 columnas."
+  >
     <div class="min-h-screen flex flex-col">
-      <header class="bg-slate-900 text-white shadow">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <p class="text-sm uppercase tracking-wide text-amber-300">Launcher Retailer</p>
-            <h1 class="text-2xl font-semibold">Panel maestro de microfrontends</h1>
-          </div>
-          <nav class="flex gap-4 text-sm" aria-label="Navegación principal">
-            <a class="hover:text-amber-300" href="/index.html">Inicio</a>
-            <a class="hover:text-amber-300" href="/dominios.html">Dominios</a>
-            <a class="hover:text-amber-300" href="/sistemas.html">Sistemas</a>
-          </nav>
-        </div>
-      </header>
+      <div data-dashboard-include="header"></div>
 
       <main class="flex-1">
         <section class="max-w-7xl mx-auto px-6 py-10">
@@ -157,11 +151,7 @@
         </section>
       </main>
 
-      <footer class="bg-slate-900 text-slate-300">
-        <div class="max-w-7xl mx-auto px-6 py-4 text-sm">
-          Launcher pensado para orquestar microfronts modulares con distribución en 1, 2 o 4 columnas.
-        </div>
-      </footer>
+      <div data-dashboard-include="footer"></div>
     </div>
   </body>
 </html>
