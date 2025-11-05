@@ -17,5 +17,4 @@ Administra la facturación, conciliación de pagos, registro contable y gestión
 ## Historias de usuario
 1. Como **analista de conciliación** quiero ver los pagos aplicados a cada pedido para asegurar que no existan desajustes contables.
 2. Como **contador** quiero generar notas de crédito automáticas cuando logística confirma la recepción de una devolución para actualizar los libros.
-3. Como **especialista fiscal** quiero configurar reglas tributarias por región para emitir facturas correctamente.
-4. Como **cliente** quiero descargar mi factura y ver el estado de un reembolso desde el portal de pedidos.
+3. Como **cliente** quiero descargar mi factura y ver el estado de un reembolso desde el portal de pedidos.
