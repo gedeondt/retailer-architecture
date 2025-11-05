@@ -67,7 +67,10 @@ test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
   const response = await fetch(new URL('/collections', systems.nosql.url));
   assert.equal(response.status, 200);
   const payload = await response.json();
-  assert.deepEqual(payload, { items: [], totalCollections: 0 });
+  assert.deepEqual(payload.items, []);
+  assert.equal(payload.totalCollections, 0);
+  assert.ok(payload.storage);
+  assert.equal(payload.storage.usedBytes, 0);
 });
 
 test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
@@ -96,5 +99,8 @@ test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
   const response = await fetch(new URL('/collections', systems.nosql.url));
   assert.equal(response.status, 200);
   const payload = await response.json();
-  assert.deepEqual(payload, { items: [], totalCollections: 0 });
+  assert.deepEqual(payload.items, []);
+  assert.equal(payload.totalCollections, 0);
+  assert.ok(payload.storage);
+  assert.equal(payload.storage.usedBytes, 0);
 });
