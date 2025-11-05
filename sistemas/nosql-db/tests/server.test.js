@@ -89,8 +89,8 @@ test('startNosqlService expone la API CRUD y de búsqueda', async (t) => {
   response = await fetch(new URL('/widget/client.jsx', url));
   assert.equal(response.status, 200);
   const widgetSource = await response.text();
-  assert.match(widgetSource, /<WidgetHeader/);
-  assert.match(widgetSource, /<NosqlCollectionsWidget \/>/);
+  assert.match(widgetSource, /const \{ useEffect, useMemo, useRef, useState \} = React;/);
+  assert.match(widgetSource, /root\.render\(<NosqlCollectionsWidget \/>\);/);
 });
 
 test('la API expone cabeceras CORS y responde preflight', async (t) => {
@@ -124,14 +124,11 @@ test('la API expone cabeceras CORS y responde preflight', async (t) => {
   assert.equal(preflightResponse.headers['access-control-allow-headers'], 'content-type');
 });
 
-test('renderWidgetShell genera un fragmento de widget listo para React', () => {
+test('renderWidgetShell genera un fragmento de widget listo para el navegador', () => {
   const html = renderWidgetShell({ apiOrigin: 'http://example.test:1234' });
   assert.match(html, /data-widget-id="sistemas-nosql-db"/);
   assert.match(html, /data-widget-size="1"/);
   assert.match(html, /data-api-origin="http:\/\/example\.test:1234"/);
-  assert.match(html, /<script src="https:\/\/unpkg\.com\/react@18\/umd\/react\.development\.js"/);
-  assert.match(html, /<script src="https:\/\/unpkg\.com\/react-dom@18\/umd\/react-dom\.development\.js"/);
-  assert.match(html, /<script src="https:\/\/unpkg\.com\/@babel\/standalone@7\/babel\.min\.js"/);
   assert.match(html, /<script type="text\/babel" data-presets="react" src="\/widget\/client\.jsx"><\/script>/);
   assert.ok(!html.includes('<html'), 'no incluye el elemento html principal');
 });

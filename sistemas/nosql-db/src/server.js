@@ -117,7 +117,7 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
     }
 
     if (url.pathname === WIDGET_CLIENT_PATH) {
-      sendText(res, 200, assets.widgetClientScript, 'text/javascript; charset=utf-8', corsHeaders);
+      sendText(res, 200, assets.widgetClientScript, 'text/plain; charset=utf-8', corsHeaders);
       return;
     }
 

@@ -1,3 +1,7 @@
+if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+  throw new Error('El widget NoSQL requiere que React y ReactDOM estén disponibles en la página del dashboard.');
+}
+
 const { useEffect, useMemo, useRef, useState } = React;
 const { createRoot } = ReactDOM;
 
@@ -114,7 +118,8 @@ function NosqlCollectionsWidget() {
         }
       } catch (error) {
         if (!cancelled) {
-          setState({ status: 'error', error: error.message, collections: [] });
+          const message = error instanceof Error ? error.message : 'Error desconocido';
+          setState({ status: 'error', error: message, collections: [] });
         }
       }
     };
@@ -133,7 +138,7 @@ function NosqlCollectionsWidget() {
   const isLoading = state.status === 'loading';
 
   return (
-    <div>
+    <div className="space-y-4">
       <WidgetHeader onReload={() => loadRef.current?.()} isLoading={isLoading} totalCollections={totalCollections} />
       {state.error ? <ErrorMessage message={state.error} /> : null}
       <CollectionsGrid collections={state.collections} />
@@ -148,4 +153,3 @@ if (!container) {
 
 const root = createRoot(container);
 root.render(<NosqlCollectionsWidget />);
-
