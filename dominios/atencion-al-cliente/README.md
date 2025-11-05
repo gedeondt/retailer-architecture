@@ -19,3 +19,4 @@ Resuelve consultas, incidencias y reclamaciones de clientes a lo largo del ciclo
 
 ## Modelo de entidades
 - [Entidades del dominio de Atención al Cliente](entities.md)
+- [Eventos publicados](events.md)

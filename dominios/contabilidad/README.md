@@ -21,3 +21,4 @@ Administra la facturación, conciliación de pagos, registro contable y gestión
 
 ## Modelo de entidades
 - [Entidades del dominio de Contabilidad](entities.md)
+- [Eventos publicados](events.md)

@@ -21,3 +21,4 @@ Coordina el fulfillment, almacenamiento, transporte y devoluciones físicas de l
 
 ## Modelo de entidades
 - [Entidades del dominio de Logística](entities.md)
+- [Eventos publicados](events.md)
