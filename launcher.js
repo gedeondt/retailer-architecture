@@ -5,6 +5,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { once } = require('node:events');
 const { startNosqlService } = require('./sistemas/nosql-db/src/server');
+const { startEventBusService } = require('./sistemas/event-bus/src/server');
 
 const DASHBOARD_DIR = path.join(__dirname, 'dashboard');
 const PAGE_MAP = new Map([
@@ -30,28 +31,42 @@ function readPageSync(filename) {
   return html;
 }
 
-function buildLauncherConfig({ nosqlService, systemsConfig }) {
-  const config = { systems: {} };
+function buildLauncherConfig({ nosqlService, eventBusService, systemsConfig }) {
+  const systems = {};
 
   const providedNosql = systemsConfig?.nosqlDb ?? {};
-  const widgetOrigin = nosqlService?.url ?? providedNosql.widgetOrigin;
-  const apiOrigin = providedNosql.apiOrigin ?? widgetOrigin;
+  const nosqlWidgetOrigin = nosqlService?.url ?? providedNosql.widgetOrigin;
+  const nosqlApiOrigin = providedNosql.apiOrigin ?? nosqlWidgetOrigin;
 
-  if (widgetOrigin || apiOrigin) {
-    config.systems.nosqlDb = {};
-    if (widgetOrigin) {
-      config.systems.nosqlDb.widgetOrigin = widgetOrigin;
+  if (nosqlWidgetOrigin || nosqlApiOrigin) {
+    systems.nosqlDb = {};
+    if (nosqlWidgetOrigin) {
+      systems.nosqlDb.widgetOrigin = nosqlWidgetOrigin;
     }
-    if (apiOrigin) {
-      config.systems.nosqlDb.apiOrigin = apiOrigin;
+    if (nosqlApiOrigin) {
+      systems.nosqlDb.apiOrigin = nosqlApiOrigin;
     }
   }
 
-  if (Object.keys(config.systems).length === 0) {
-    delete config.systems;
+  const providedEventBus = systemsConfig?.eventBus ?? {};
+  const eventBusWidgetOrigin = eventBusService?.url ?? providedEventBus.widgetOrigin;
+  const eventBusApiOrigin = providedEventBus.apiOrigin ?? eventBusWidgetOrigin;
+
+  if (eventBusWidgetOrigin || eventBusApiOrigin) {
+    systems.eventBus = {};
+    if (eventBusWidgetOrigin) {
+      systems.eventBus.widgetOrigin = eventBusWidgetOrigin;
+    }
+    if (eventBusApiOrigin) {
+      systems.eventBus.apiOrigin = eventBusApiOrigin;
+    }
   }
 
-  return config;
+  if (Object.keys(systems).length === 0) {
+    return {};
+  }
+
+  return { systems };
 }
 
 function injectLauncherConfig(html, config) {
@@ -95,10 +110,18 @@ async function startLauncher(options = {}) {
 
   const launchedSystems = [];
   let nosqlService = null;
+  let eventBusService = null;
 
   if (startSystems) {
     nosqlService = await startNosqlService({ ...(systemsConfig.nosqlDb ?? {}) });
     launchedSystems.push(nosqlService);
+
+    const eventBusOptions = systemsConfig.eventBus ?? {};
+    if (eventBusOptions.startService !== false) {
+      const { startService: _ignored, ...serviceOptions } = eventBusOptions;
+      eventBusService = await startEventBusService(serviceOptions);
+      launchedSystems.push(eventBusService);
+    }
   }
 
   const server = http.createServer((req, res) => {
@@ -117,7 +140,7 @@ async function startLauncher(options = {}) {
         let html = readPageSync(pageFilename);
 
         if (pageFilename === 'sistemas.html') {
-          const launcherConfig = buildLauncherConfig({ nosqlService, systemsConfig });
+          const launcherConfig = buildLauncherConfig({ nosqlService, eventBusService, systemsConfig });
           html = injectLauncherConfig(html, launcherConfig);
         }
 
@@ -157,7 +180,7 @@ async function startLauncher(options = {}) {
     await closeServer();
   };
 
-  return { url, close, server, systems: { nosql: nosqlService } };
+  return { url, close, server, systems: { nosql: nosqlService, eventBus: eventBusService } };
 }
 
 module.exports = {
