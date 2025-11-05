@@ -16,6 +16,7 @@ Gestiona la experiencia de compra digital: navegación, carrito, pricing, promoc
 
 ## Historias de usuario
 1. Como **cliente digital** quiero confirmar mi pedido con múltiples métodos de pago para completar la compra sin fricciones.
-2. Como **agente de soporte comercial** quiero duplicar un pedido en nombre del cliente para asistirlo si el checkout falla.
-3. Como **analista de catálogo** quiero actualizar precios y disponibilidad en tiempo real para evitar ventas de productos sin stock.
-4. Como **seller del marketplace** quiero ver el resumen de mis pedidos entrantes para preparar mis despachos a tiempo.
+2. Como **cliente digital** quiero ver el resumen de mis pedidos.
+3. Como **cliente digital** quiero iniciar una reclamación de un pedido y ser su evolución.
+4. Como **cliente digital** quiero descargar las facturas de mis pedidos.
+
