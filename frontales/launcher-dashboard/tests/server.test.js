@@ -6,7 +6,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 
-const { startLauncher, createDashboardHTML } = require('../src/server');
+const { startDashboardServer, createDashboardHTML } = require('../src/server');
 
 test('createDashboardHTML lee la página principal desde el sistema de archivos', () => {
   const html = createDashboardHTML();
@@ -23,8 +23,8 @@ test('createDashboardHTML lee la página principal desde el sistema de archivos'
   );
 });
 
-test('startLauncher sirve páginas independientes para cada sección', async (t) => {
-  const { url, close } = await startLauncher({ port: 0, startSystems: false });
+test('startDashboardServer sirve páginas independientes para cada sección', async (t) => {
+  const { url, close } = await startDashboardServer({ port: 0 });
   t.after(close);
 
   const homeResponse = await fetch(url);
@@ -49,14 +49,20 @@ test('startLauncher sirve páginas independientes para cada sección', async (t)
   assert.match(sistemasBody, /Cargando widget Event Bus…/);
 });
 
-test('startLauncher inyecta la configuración de los widgets de sistemas en la página', async (t) => {
+test('startDashboardServer inyecta la configuración de los widgets cuando se proporcionan sistemas', async (t) => {
   const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-config-'));
   const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-config-'));
-  const { url, close, systems } = await startLauncher({
+  const runtimeSystems = {
+    nosql: { url: 'http://127.0.0.1:5001' },
+    eventBus: { url: 'http://127.0.0.1:5002' },
+  };
+
+  const { url, close } = await startDashboardServer({
     port: 0,
+    runtimeSystems,
     systemsConfig: {
-      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: nosqlDir },
-      eventBus: { port: 0, host: '127.0.0.1', dataDir: eventBusDir },
+      nosqlDb: { apiOrigin: 'http://127.0.0.1:6001', dataDir: nosqlDir },
+      eventBus: { apiOrigin: 'http://127.0.0.1:6002', dataDir: eventBusDir },
     },
   });
 
@@ -72,81 +78,36 @@ test('startLauncher inyecta la configuración de los widgets de sistemas en la p
 
   assert.ok(body.includes('window.__LAUNCHER_CONFIG__'), 'se inyecta la configuración global');
   assert.ok(
-    body.includes(`"widgetOrigin":"${systems.nosql.url}`),
-    'se expone el origen del widget NoSQL',
+    body.includes('"widgetOrigin":"http://127.0.0.1:5001'),
+    'se expone el origen del widget NoSQL desde el runtime',
   );
   assert.ok(
-    body.includes(`"apiOrigin":"${systems.nosql.url}`),
-    'se expone el origen de la API de NoSQL',
-  );
-  assert.ok(systems.eventBus, 'se obtiene la instancia del servicio Event Bus');
-  assert.ok(
-    body.includes(`"widgetOrigin":"${systems.eventBus.url}`),
-    'se expone el origen del widget Event Bus',
+    body.includes('"apiOrigin":"http://127.0.0.1:6001'),
+    'se respeta la API de NoSQL proporcionada',
   );
   assert.ok(
-    body.includes(`"apiOrigin":"${systems.eventBus.url}`),
-    'se expone el origen de la API del Event Bus',
+    body.includes('"widgetOrigin":"http://127.0.0.1:5002'),
+    'se utiliza el widget del Event Bus del runtime',
+  );
+  assert.ok(
+    body.includes('"apiOrigin":"http://127.0.0.1:6002'),
+    'se combina el runtime con la API del Event Bus',
   );
 });
 
-test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
-  const { url, close } = await startLauncher({ startSystems: false });
+test('startDashboardServer utiliza el puerto 3000 por defecto', async (t) => {
+  const { url, close } = await startDashboardServer();
   t.after(close);
 
   assert.match(url, /:3000\//);
 });
 
-test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
-  const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-'));
-  const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-'));
-  const { close, systems } = await startLauncher({
-    port: 0,
-    systemsConfig: {
-      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: nosqlDir },
-      eventBus: { port: 0, host: '127.0.0.1', dataDir: eventBusDir },
-    },
-  });
+test('startDashboardServer sirve los archivos JavaScript del dashboard', async (t) => {
+  const { url, close } = await startDashboardServer({ port: 0 });
+  t.after(close);
 
-  t.after(async () => {
-    await close();
-    await fs.rm(nosqlDir, { recursive: true, force: true });
-    await fs.rm(eventBusDir, { recursive: true, force: true });
-  });
-
-  assert.ok(systems.nosql, 'se obtiene la instancia del servicio NoSQL');
-
-  const response = await fetch(new URL('/collections', systems.nosql.url));
-  assert.equal(response.status, 200);
-  const payload = await response.json();
-  assert.deepEqual(payload.items, []);
-  assert.equal(payload.totalCollections, 0);
-  assert.ok(payload.storage);
-  assert.equal(payload.storage.usedBytes, 0);
-});
-
-test('startLauncher inicia el servicio Event Bus por defecto', async (t) => {
-  const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-eventbus-'));
-  const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-'));
-  const { close, systems } = await startLauncher({
-    port: 0,
-    systemsConfig: {
-      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: nosqlDir },
-      eventBus: { port: 0, host: '127.0.0.1', dataDir: eventBusDir },
-    },
-  });
-
-  t.after(async () => {
-    await close();
-    await fs.rm(nosqlDir, { recursive: true, force: true });
-    await fs.rm(eventBusDir, { recursive: true, force: true });
-  });
-
-  assert.ok(systems.eventBus, 'se obtiene la instancia del servicio Event Bus');
-
-  const response = await fetch(new URL('/overview', systems.eventBus.url));
-  assert.equal(response.status, 200);
-  const payload = await response.json();
-  assert.equal(payload.totalEvents, 0);
-  assert.deepEqual(payload.recentEvents, []);
+  const scriptResponse = await fetch(new URL('/dashboard/scripts/dashboard-layout.js', url));
+  assert.equal(scriptResponse.status, 200);
+  const scriptBody = await scriptResponse.text();
+  assert.match(scriptBody, /loadDashboardLayout/);
 });
