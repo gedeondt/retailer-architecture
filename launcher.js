@@ -30,6 +30,50 @@ function readPageSync(filename) {
   return html;
 }
 
+function buildLauncherConfig({ nosqlService, systemsConfig }) {
+  const config = { systems: {} };
+
+  const providedNosql = systemsConfig?.nosqlDb ?? {};
+  const widgetOrigin = nosqlService?.url ?? providedNosql.widgetOrigin;
+  const apiOrigin = providedNosql.apiOrigin ?? widgetOrigin;
+
+  if (widgetOrigin || apiOrigin) {
+    config.systems.nosqlDb = {};
+    if (widgetOrigin) {
+      config.systems.nosqlDb.widgetOrigin = widgetOrigin;
+    }
+    if (apiOrigin) {
+      config.systems.nosqlDb.apiOrigin = apiOrigin;
+    }
+  }
+
+  if (Object.keys(config.systems).length === 0) {
+    delete config.systems;
+  }
+
+  return config;
+}
+
+function injectLauncherConfig(html, config) {
+  if (!config || Object.keys(config).length === 0) {
+    return html;
+  }
+
+  const serialized = JSON.stringify(config);
+  const configScript = `<script>window.__LAUNCHER_CONFIG__ = ${serialized};</script>`;
+  const marker = '<script type="module">';
+
+  if (html.includes(marker)) {
+    return html.replace(marker, `${configScript}\n    ${marker}`);
+  }
+
+  if (html.includes('</body>')) {
+    return html.replace('</body>', `    ${configScript}\n  </body>`);
+  }
+
+  return `${html}\n${configScript}`;
+}
+
 function normalizePathname(pathname) {
   if (pathname.length > 1 && pathname.endsWith('/')) {
     return pathname.slice(0, -1);
@@ -70,7 +114,13 @@ async function startLauncher(options = {}) {
 
     if (pageFilename) {
       try {
-        const html = readPageSync(pageFilename);
+        let html = readPageSync(pageFilename);
+
+        if (pageFilename === 'sistemas.html') {
+          const launcherConfig = buildLauncherConfig({ nosqlService, systemsConfig });
+          html = injectLauncherConfig(html, launcherConfig);
+        }
+
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
       } catch (error) {

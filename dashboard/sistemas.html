@@ -176,8 +176,13 @@
           return;
         }
 
-        const widgetOrigin = slot.dataset.widgetOrigin || 'http://127.0.0.1:4100';
-        const apiOrigin = slot.dataset.apiOrigin || widgetOrigin;
+        const launcherConfig = window.__LAUNCHER_CONFIG__ || {};
+        const nosqlConfig =
+          (launcherConfig.systems && launcherConfig.systems.nosqlDb) || {};
+
+        const widgetOrigin =
+          nosqlConfig.widgetOrigin || slot.dataset.widgetOrigin || 'http://127.0.0.1:4100';
+        const apiOrigin = nosqlConfig.apiOrigin || slot.dataset.apiOrigin || widgetOrigin;
 
         try {
           const widgetUrl = new URL('/widget', widgetOrigin);
