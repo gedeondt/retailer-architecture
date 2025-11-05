@@ -44,3 +44,22 @@ Para mantener la coherencia del ecosistema, todas las piezas de software deberá
 - **Launcher general:** el lanzador expondrá un dashboard web que integra Tailwind UI y será el responsable de invocar cada script Node.js con los parámetros necesarios, armonizando la configuración de toda la arquitectura.
 
 Estos lineamientos se irán enriqueciendo conforme evolucionen los dominios y las necesidades del simulador.
+
+## Dashboard del launcher
+
+El dashboard del launcher funciona como el punto de entrada visual para los microfronts. Su diseño responde a los siguientes principios:
+
+- **Menú principal organizado por contexto:** la barra superior permite saltar entre la vista de inicio (con widgets seleccionados), la biblioteca completa de widgets por dominio y los sistemas transversales.
+- **Rejilla de cuatro columnas:** la distribución base trabaja con una grilla responsiva de cuatro columnas en escritorio. Cada microfront define el ancho de su contenedor (1, 2 o 4 columnas) mediante las clases utilitarias de Tailwind, lo que facilita combinar widgets panorámicos con otros más compactos.
+- **Widgets auto descriptivos:** los contenedores incluyen metadatos (`data-widget-id` y `data-widget-size`) para que el launcher pueda identificar y orquestar cada microfront en futuras iteraciones.
+- **Estética coherente:** se apalanca Tailwind UI para lograr un aspecto clásico de dashboard sin necesidad de estilos personalizados.
+
+### Prueba de concepto inicial
+
+La raíz del repositorio incluye un `launcher.js` que levanta un servidor HTTP mínimo y sirve un dashboard de ejemplo con widgets simulados. Para visualizarlo:
+
+```bash
+node launcher.js
+```
+
+El comando imprimirá en consola la URL local del dashboard. Al abrirla en el navegador se podrá validar la composición visual del panel maestro.
