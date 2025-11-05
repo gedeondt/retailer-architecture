@@ -40,5 +40,7 @@ Para mantener la coherencia del ecosistema, todas las piezas de software deberá
 - **Gestión de dependencias:** todas las dependencias se administran con npm. Desde la raíz existirá un script en Node.js que ejecute los `npm install` de todos los paquetes del proyecto en un solo paso.
 - **Lanzadores:** se proveerán scripts Node.js en la raíz para orquestar el arranque de todos los servicios/frontales y la ejecución consolidada de los tests. Al finalizar (por ejemplo, mediante `Ctrl+C`) los procesos se cancelarán limpiamente.
 - **Estado de los servicios:** cada servicio debe purgar su estado al inicio de la ejecución para garantizar que parte de un contexto limpio.
+- **Frontales:** todos los microfrontends se implementarán con React y, salvo que se especifique lo contrario, funcionarán sin Shadow DOM. Para mantener la coherencia visual se priorizará el uso de Tailwind UI cargado vía CDN por el launcher y se evitará definir CSS adicional a menos que sea imprescindible.
+- **Launcher general:** el lanzador expondrá un dashboard web que integra Tailwind UI y será el responsable de invocar cada script Node.js con los parámetros necesarios, armonizando la configuración de toda la arquitectura.
 
 Estos lineamientos se irán enriqueciendo conforme evolucionen los dominios y las necesidades del simulador.
