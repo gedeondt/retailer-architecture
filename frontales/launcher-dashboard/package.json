@@ -1,0 +1,23 @@
+{
+  "name": "@retailer/launcher-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard launcher para orquestar microfronts del retailer",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "retailer",
+    "launcher",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
