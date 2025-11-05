@@ -119,9 +119,14 @@ function decodeConsumerSegment(segment) {
   }
 }
 
-async function buildOverview(log) {
-  const events = await log.listEvents();
-  const consumers = await log.listConsumers();
+async function buildOverview(log, channel) {
+  if (typeof channel !== 'string' || channel.trim().length === 0) {
+    throw new HttpError(400, 'El parámetro channel es obligatorio');
+  }
+
+  const targetChannel = channel.trim();
+  const events = await log.listEvents({ channel: targetChannel });
+  const consumers = await log.listConsumers({ channel: targetChannel });
   const lastEvent = events.length > 0 ? events[events.length - 1] : null;
   const highWatermark = lastEvent ? lastEvent.id : 0;
   const recentEvents = events.slice(-10).reverse();
@@ -132,6 +137,7 @@ async function buildOverview(log) {
   }));
 
   return {
+    channel: targetChannel,
     totalEvents: events.length,
     highWatermark,
     lastEvent,
@@ -140,12 +146,15 @@ async function buildOverview(log) {
   };
 }
 
-async function ensureConsumer(log, name) {
+async function ensureConsumer(log, name, channel) {
   const trimmed = name.trim();
   if (!trimmed) {
     throw new HttpError(400, 'El nombre del consumidor es obligatorio');
   }
-  return log.createConsumer(trimmed);
+  if (typeof channel !== 'string' || channel.trim().length === 0) {
+    throw new HttpError(400, 'El canal del consumidor es obligatorio');
+  }
+  return log.createConsumer(trimmed, { channel: channel.trim() });
 }
 
 async function handleEventsRoute(req, res, url, log, corsHeaders) {
@@ -156,7 +165,15 @@ async function handleEventsRoute(req, res, url, log, corsHeaders) {
       allowZero: false,
     });
 
-    const events = since !== null ? await log.getEventsSince(since) : await log.listEvents();
+    const channelParam = url.searchParams.get('channel');
+    if (!channelParam) {
+      throw new HttpError(400, 'El parámetro channel es obligatorio');
+    }
+
+    const events =
+      since !== null
+        ? await log.getEventsSince(since, { channel: channelParam })
+        : await log.listEvents({ channel: channelParam });
     const sliced = limit !== null ? events.slice(0, limit) : events;
     sendJson(res, 200, { items: sliced }, corsHeaders);
     return;
@@ -164,7 +181,14 @@ async function handleEventsRoute(req, res, url, log, corsHeaders) {
 
   if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const record = await log.append({ type: body.type ?? null, payload: body.payload ?? null });
+    if (typeof body.channel !== 'string' || body.channel.trim().length === 0) {
+      throw new HttpError(400, 'channel es obligatorio y debe ser una cadena no vacía');
+    }
+    const record = await log.append({
+      channel: body.channel,
+      type: body.type ?? null,
+      payload: body.payload ?? null,
+    });
     sendJson(res, 201, record, corsHeaders);
     return;
   }
@@ -180,7 +204,12 @@ async function handleEventsRoute(req, res, url, log, corsHeaders) {
 
 async function handleConsumersRoute(req, res, url, log, corsHeaders) {
   if (req.method === 'GET' && url.pathname === '/consumers') {
-    const consumers = await log.listConsumers();
+    const channelParam = url.searchParams.get('channel');
+    if (!channelParam) {
+      throw new HttpError(400, 'El parámetro channel es obligatorio');
+    }
+
+    const consumers = await log.listConsumers({ channel: channelParam });
     sendJson(res, 200, { items: consumers }, corsHeaders);
     return;
   }
@@ -191,9 +220,13 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
       throw new HttpError(400, 'El nombre del consumidor es obligatorio');
     }
 
-    const consumer = await ensureConsumer(log, body.name);
+    if (typeof body.channel !== 'string' || body.channel.trim().length === 0) {
+      throw new HttpError(400, 'El canal del consumidor es obligatorio');
+    }
+
+    const consumer = await ensureConsumer(log, body.name, body.channel);
     const offset = await consumer.getOffset();
-    sendJson(res, 201, { name: consumer.name, offset }, corsHeaders);
+    sendJson(res, 201, { name: consumer.name, channel: consumer.channel, offset }, corsHeaders);
     return;
   }
 
@@ -203,7 +236,12 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
   }
 
   const name = decodeConsumerSegment(segments[1]);
-  const consumer = await ensureConsumer(log, name);
+  const channelParam = url.searchParams.get('channel');
+  if (!channelParam) {
+    throw new HttpError(400, 'El parámetro channel es obligatorio');
+  }
+
+  const consumer = await ensureConsumer(log, name, channelParam);
 
   if (segments.length === 3 && segments[2] === 'poll') {
     if (req.method !== 'POST') {
@@ -228,6 +266,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
       200,
       {
         name: consumer.name,
+        channel: consumer.channel,
         items: batch,
         committedOffset: offset,
         lastDeliveredEventId: batch.length > 0 ? batch[batch.length - 1].id : null,
@@ -253,7 +292,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
 
     await consumer.commit(value);
     const offset = await consumer.getOffset();
-    sendJson(res, 200, { name: consumer.name, offset }, corsHeaders);
+    sendJson(res, 200, { name: consumer.name, channel: consumer.channel, offset }, corsHeaders);
     return;
   }
 
@@ -263,7 +302,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
     }
 
     await consumer.reset();
-    sendJson(res, 200, { name: consumer.name, offset: 0 }, corsHeaders);
+    sendJson(res, 200, { name: consumer.name, channel: consumer.channel, offset: 0 }, corsHeaders);
     return;
   }
 
@@ -309,7 +348,12 @@ async function handleRequest(req, res, context) {
   }
 
   if (req.method === 'GET' && url.pathname === '/overview') {
-    const overview = await buildOverview(context.log);
+    const channelParam = url.searchParams.get('channel');
+    if (!channelParam) {
+      throw new HttpError(400, 'El parámetro channel es obligatorio');
+    }
+
+    const overview = await buildOverview(context.log, channelParam);
     sendJson(res, 200, overview, corsHeaders);
     return;
   }

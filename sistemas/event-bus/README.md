@@ -2,6 +2,8 @@
 
 Un bus de eventos minimalista inspirado en la filosofía NoSQL del repositorio: almacenamiento basado en archivos JSON, sin particiones ni réplicas y con APIs triviales para productores y consumidores.
 
+Cada evento pertenece a un **canal** identificado por nombre. Los canales se crean bajo demanda o al inicializar el log y todas las operaciones (lectura, escritura, métricas y consumo) requieren que se especifique explícitamente el canal objetivo.
+
 ## Estructura básica
 
 El paquete expone un `SimpleEventLog` persistente en disco, utilidades para inicializarlo bajo demanda y un servicio HTTP listo para integrarse en el dashboard.
@@ -17,7 +19,7 @@ const {
 } = require('@retailer/sistemas-event-bus');
 ```
 
-Todos los artefactos viven por defecto en `sistemas/event-bus/data/` (puedes sobreescribir la ruta con la opción `dataDir`). El log asegura IDs secuenciales que comienzan en `1` y persiste un registro por línea.
+Todos los artefactos viven por defecto en `sistemas/event-bus/data/` (puedes sobreescribir la ruta con la opción `dataDir`). El log asegura IDs secuenciales que comienzan en `1` **por canal** y persiste un registro por línea. La metadata en `meta.json` guarda los canales registrados y su último identificador entregado.
 
 ## startEventBus(options)
 
@@ -27,8 +29,16 @@ Inicializa un `SimpleEventLog` listo para usarse y devuelve `{ log, close }`.
 - Cualquier otra opción se pasa al constructor de `SimpleEventLog`.
 
 ```js
-const { log, close } = await startEventBus({ dataDir: '/tmp/eventos' });
-await log.append({ type: 'pedido.creado', payload: { pedidoId: 'P-1' } });
+const { log, close } = await startEventBus({
+  dataDir: '/tmp/eventos',
+  channels: ['pedidos'],
+});
+
+await log.append({
+  channel: 'pedidos',
+  type: 'pedido.creado',
+  payload: { pedidoId: 'P-1' },
+});
 await close();
 ```
 
@@ -54,23 +64,24 @@ La ejecución directa `node src/server.js` expone la API y el widget con CORS ha
 
 Constructor de bajo nivel utilizado internamente.
 
-- `dataDir`: carpeta donde se guardan `events.log`, `meta.json` y los offsets de consumidores.
+- `dataDir`: carpeta donde se guardan los archivos por canal, `meta.json` y los offsets de consumidores.
 - `clock`: función que devuelve `Date`. Útil para pruebas.
+- `channels`: array de nombres de canal que se deben preparar tras un `reset()` inicial.
 
 ### Métodos principales
 
-- `append({ type?, payload? })`: agrega un evento con ID autoincremental y marca de tiempo ISO.
-- `listEvents()`: devuelve todos los eventos registrados.
-- `getEventsSince(offset = 0)`: filtra los eventos con `id` mayor a `offset`.
-- `createConsumer(name)`: registra un consumidor y devuelve una instancia de `EventConsumer` asociada.
-- `listConsumers()`: lista los consumidores registrados, su `offset` y la fecha de última actualización.
+- `append({ channel, type?, payload? })`: agrega un evento en el canal indicado con ID autoincremental y marca de tiempo ISO.
+- `listEvents({ channel })`: devuelve todos los eventos registrados en el canal solicitado.
+- `getEventsSince(offset = 0, { channel })`: filtra los eventos del canal cuyo `id` sea mayor a `offset`.
+- `createConsumer(name, { channel })`: registra un consumidor asociado a un canal concreto y devuelve una instancia de `EventConsumer` ligada a dicho canal.
+- `listConsumers({ channel? })`: lista los consumidores registrados opcionalmente filtrados por canal, incluyendo su `offset` y la fecha de última actualización.
 - `reset()`: borra eventos y offsets dejándolo en estado limpio.
 
 ## EventConsumer
 
-Representa un consumidor con offset persistente en disco (`data/consumers/<nombre>.json`).
+Representa un consumidor con offset persistente en disco (`data/consumers/<canal>/<nombre>.json`).
 
-- `poll({ limit = Infinity, autoCommit = true } = {})`: obtiene eventos a partir del último offset. Si `autoCommit` es `true`, guarda el offset del último evento recibido.
+- `poll({ limit = Infinity, autoCommit = true } = {})`: obtiene eventos del canal asociado a partir del último offset. Si `autoCommit` es `true`, guarda el offset del último evento recibido.
 - `commit(lastEventId)`: fija manualmente el offset en el ID indicado.
 - `reset()`: reinicia el offset a `0`.
 - `getOffset()`: devuelve el offset persistido sin modificarlo.
@@ -78,7 +89,7 @@ Representa un consumidor con offset persistente en disco (`data/consumers/<nombr
 Ejemplo de consumo manual:
 
 ```js
-const consumer = await log.createConsumer('facturacion');
+const consumer = await log.createConsumer('facturacion', { channel: 'pedidos' });
 const batch = await consumer.poll({ limit: 10, autoCommit: false });
 // procesar batch...
 if (batch.length > 0) {
@@ -92,29 +103,27 @@ El servicio expone endpoints REST con CORS habilitado (origen dinámico según e
 
 ### Eventos (`/events`)
 
-- `GET /events?since=<offset>&limit=<n>`: lista eventos en orden ascendente. `since` y `limit` son opcionales.
-- `POST /events`: crea un evento. Cuerpo JSON `{ type?, payload? }`.
+- `GET /events?channel=<canal>&since=<offset>&limit=<n>`: lista eventos en orden ascendente dentro del canal indicado. `since` y `limit` son opcionales.
+- `POST /events`: crea un evento. Cuerpo JSON `{ channel, type?, payload? }`.
 - `DELETE /events`: resetea el log (eventos y offsets).
 
 ```bash
 curl -X POST http://localhost:4200/events \
   -H 'Content-Type: application/json' \
-  -d '{"type":"pedido.creado","payload":{"id":"P-1"}}'
+  -d '{"channel":"pedidos","type":"pedido.creado","payload":{"id":"P-1"}}'
 ```
 
-### Consumidores (`/consumers`)
+- `GET /consumers?channel=<canal>`: devuelve `{ items: [{ name, channel, offset, updatedAt }] }` del canal solicitado.
+- `POST /consumers`: crea (o asegura) un consumidor. Cuerpo `{ name, channel }`.
+- `POST /consumers/:name/poll?channel=<canal>`: obtiene eventos pendientes del canal asociado. Cuerpo opcional `{ limit?, autoCommit? }`.
+- `POST /consumers/:name/commit?channel=<canal>`: fija manualmente el offset. Cuerpo `{ lastEventId }`.
+- `POST /consumers/:name/reset?channel=<canal>`: reinicia el offset a `0`.
 
-- `GET /consumers`: devuelve `{ items: [{ name, offset, updatedAt }] }`.
-- `POST /consumers`: crea (o asegura) un consumidor. Cuerpo `{ name }`.
-- `POST /consumers/:name/poll`: obtiene eventos pendientes. Cuerpo opcional `{ limit?, autoCommit? }`.
-- `POST /consumers/:name/commit`: fija manualmente el offset. Cuerpo `{ lastEventId }`.
-- `POST /consumers/:name/reset`: reinicia el offset a `0`.
-
-El endpoint `poll` devuelve `{ name, items, committedOffset, lastDeliveredEventId }`, permitiendo inspeccionar si el `autoCommit` avanzó el offset.
+El endpoint `poll` devuelve `{ name, channel, items, committedOffset, lastDeliveredEventId }`, permitiendo inspeccionar si el `autoCommit` avanzó el offset.
 
 ### Métricas y widget
 
-- `GET /overview`: agrega métricas (`totalEvents`, `highWatermark`, `recentEvents`, `consumers`) usadas por el dashboard.
+- `GET /overview?channel=<canal>`: agrega métricas (`totalEvents`, `highWatermark`, `recentEvents`, `consumers`) usadas por el dashboard para el canal indicado.
 - `GET /widget`: entrega el HTML del widget (`renderWidgetShell`). Acepta `?apiOrigin=<url>` para forzar el origen de las APIs.
 - `GET /widget/client.jsx`: expone el cliente React que renderiza el widget (sin caché).
 
