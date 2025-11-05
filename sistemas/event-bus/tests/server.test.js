@@ -138,11 +138,19 @@ test('overview agrega métricas y refleja consumidores y eventos', async (t) => 
 test('sirve el widget HTML y el cliente React', async (t) => {
   const service = await createService(t);
 
-  const widgetResponse = await fetch(urlFor(service, '/widget?apiOrigin=http://demo')); 
+  const widgetResponse = await fetch(urlFor(service, '/widget?apiOrigin=http://demo'));
   assert.equal(widgetResponse.status, 200);
   const widgetHtml = await widgetResponse.text();
   assert.ok(widgetHtml.includes('data-widget-id="sistemas-event-bus"'));
   assert.ok(widgetHtml.includes('data-api-origin="http://demo"'));
+  assert.ok(widgetHtml.includes('data-channel="general"'));
+
+  const customChannelResponse = await fetch(
+    urlFor(service, '/widget?apiOrigin=http://demo&channel=ventas'),
+  );
+  assert.equal(customChannelResponse.status, 200);
+  const customChannelHtml = await customChannelResponse.text();
+  assert.ok(customChannelHtml.includes('data-channel="ventas"'));
 
   const clientResponse = await fetch(urlFor(service, '/widget/client.jsx'));
   assert.equal(clientResponse.status, 200);

@@ -325,7 +325,14 @@ async function handleRequest(req, res, context) {
 
   if (req.method === 'GET' && url.pathname === '/widget') {
     const apiOrigin = url.searchParams.get('apiOrigin') || undefined;
-    sendText(res, 200, renderWidgetShell({ apiOrigin }), 'text/html; charset=utf-8', corsHeaders);
+    const channelParam = url.searchParams.get('channel') || undefined;
+    sendText(
+      res,
+      200,
+      renderWidgetShell({ apiOrigin, channel: channelParam }),
+      'text/html; charset=utf-8',
+      corsHeaders,
+    );
     return;
   }
 

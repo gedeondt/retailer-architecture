@@ -20,6 +20,7 @@ function buildLauncherConfig({ nosqlService, eventBusService, systemsConfig }) {
   const providedEventBus = systemsConfig?.eventBus ?? {};
   const eventBusWidgetOrigin = eventBusService?.url ?? providedEventBus.widgetOrigin;
   const eventBusApiOrigin = providedEventBus.apiOrigin ?? eventBusWidgetOrigin;
+  const eventBusChannel = providedEventBus.channel;
 
   if (eventBusWidgetOrigin || eventBusApiOrigin) {
     systems.eventBus = {};
@@ -28,6 +29,9 @@ function buildLauncherConfig({ nosqlService, eventBusService, systemsConfig }) {
     }
     if (eventBusApiOrigin) {
       systems.eventBus.apiOrigin = eventBusApiOrigin;
+    }
+    if (eventBusChannel) {
+      systems.eventBus.channel = eventBusChannel;
     }
   }
 

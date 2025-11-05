@@ -47,6 +47,7 @@ test('startDashboardServer sirve páginas independientes para cada sección', as
   assert.match(sistemasBody, /Cargando widget NoSQL…/);
   assert.match(sistemasBody, /id="event-bus-widget-slot"/);
   assert.match(sistemasBody, /Cargando widget Event Bus…/);
+  assert.match(sistemasBody, /data-channel="general"/);
 });
 
 test('startDashboardServer inyecta la configuración de los widgets cuando se proporcionan sistemas', async (t) => {
@@ -62,7 +63,7 @@ test('startDashboardServer inyecta la configuración de los widgets cuando se pr
     runtimeSystems,
     systemsConfig: {
       nosqlDb: { apiOrigin: 'http://127.0.0.1:6001', dataDir: nosqlDir },
-      eventBus: { apiOrigin: 'http://127.0.0.1:6002', dataDir: eventBusDir },
+      eventBus: { apiOrigin: 'http://127.0.0.1:6002', dataDir: eventBusDir, channel: 'ventas' },
     },
   });
 
@@ -93,6 +94,7 @@ test('startDashboardServer inyecta la configuración de los widgets cuando se pr
     body.includes('"apiOrigin":"http://127.0.0.1:6002'),
     'se combina el runtime con la API del Event Bus',
   );
+  assert.ok(body.includes('"channel":"ventas"'), 'expone el canal configurado del Event Bus');
 });
 
 test('startDashboardServer utiliza el puerto 3000 por defecto', async (t) => {
