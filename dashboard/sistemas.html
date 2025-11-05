@@ -8,22 +8,17 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin="anonymous"></script>
+    <script type="module" src="/dashboard/scripts/widget-loader.js"></script>
+    <script type="module" src="/dashboard/scripts/dashboard-layout.js"></script>
   </head>
-  <body class="bg-slate-100 min-h-screen text-slate-900">
+  <body
+    class="bg-slate-100 min-h-screen text-slate-900"
+    data-dashboard-title="Sistemas transversales"
+    data-dashboard-section="sistemas"
+    data-dashboard-footer="Mantén sincronizados los sistemas compartidos monitoreando la latencia y disponibilidad."
+  >
     <div class="min-h-screen flex flex-col">
-      <header class="bg-slate-900 text-white shadow">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <p class="text-sm uppercase tracking-wide text-amber-300">Launcher Retailer</p>
-            <h1 class="text-2xl font-semibold">Sistemas transversales</h1>
-          </div>
-          <nav class="flex gap-4 text-sm" aria-label="Navegación principal">
-            <a class="hover:text-amber-300" href="/index.html">Inicio</a>
-            <a class="hover:text-amber-300" href="/dominios.html">Dominios</a>
-            <a class="hover:text-amber-300" href="/sistemas.html" aria-current="page">Sistemas</a>
-          </nav>
-        </div>
-      </header>
+      <div data-dashboard-include="header"></div>
 
       <main class="flex-1">
         <section class="max-w-7xl mx-auto px-6 py-10">
@@ -72,193 +67,9 @@
         </section>
       </main>
 
-      <footer class="bg-slate-900 text-slate-300">
-        <div class="max-w-7xl mx-auto px-6 py-4 text-sm">
-          Mantén sincronizados los sistemas compartidos monitoreando la latencia y disponibilidad.
-        </div>
-      </footer>
+      <div data-dashboard-include="footer"></div>
     </div>
-    <script type="module">
-      function toAbsoluteUrl(value, base) {
-        if (!value) {
-          return value;
-        }
-        if (/^https?:/i.test(value)) {
-          return value;
-        }
-        return new URL(value, base).toString();
-      }
 
-      function parseListAttribute(value) {
-        if (!value) {
-          return [];
-        }
-        return value
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean);
-      }
-
-      async function executeBabelScript(script) {
-        if (typeof window.Babel === 'undefined' || typeof window.Babel.transform !== 'function') {
-          throw new Error('Babel no está disponible para transformar el widget NoSQL.');
-        }
-
-        const dataset = script.dataset || {};
-        const presets = parseListAttribute(dataset.presets);
-        const plugins = parseListAttribute(dataset.plugins);
-        const sourceType = dataset.type === 'module' ? 'module' : 'script';
-        const filename = dataset.filename || (script.getAttribute('src') || 'widget.jsx');
-
-        let sourceCode = script.textContent || '';
-        const scriptSrc = script.getAttribute('src');
-        if (scriptSrc) {
-          const response = await fetch(scriptSrc);
-          if (!response.ok) {
-            throw new Error(`no se pudo descargar el cliente del widget (${response.status})`);
-          }
-          sourceCode = await response.text();
-        }
-
-        const transformed = window.Babel.transform(sourceCode, {
-          presets,
-          plugins,
-          sourceType,
-          filename,
-        });
-
-        const runnable = document.createElement('script');
-        runnable.type = sourceType === 'module' ? 'module' : 'text/javascript';
-        runnable.text = transformed.code;
-        script.replaceWith(runnable);
-      }
-
-      function cloneScriptAttributes(source, target, options = {}) {
-        const skip = options.skip ? new Set(options.skip) : new Set();
-        for (const attr of source.attributes) {
-          if (skip.has(attr.name)) {
-            continue;
-          }
-          if (attr.name === 'src') {
-            target.src = attr.value;
-          } else {
-            target.setAttribute(attr.name, attr.value);
-          }
-        }
-      }
-
-      async function executeExternalScript(script) {
-        const runnable = document.createElement('script');
-        cloneScriptAttributes(script, runnable);
-        await new Promise((resolve, reject) => {
-          runnable.addEventListener('load', resolve, { once: true });
-          runnable.addEventListener(
-            'error',
-            () => reject(new Error(`no se pudo cargar el script ${script.src || script.getAttribute('src')}`)),
-            { once: true },
-          );
-          script.replaceWith(runnable);
-        });
-      }
-
-      function executeInlineScript(script) {
-        const runnable = document.createElement('script');
-        cloneScriptAttributes(script, runnable, { skip: ['type'] });
-        runnable.type = script.type && script.type !== 'text/babel' ? script.type : 'text/javascript';
-        runnable.text = script.textContent || '';
-        script.replaceWith(runnable);
-      }
-
-      async function bootstrapScript(script) {
-        const type = (script.getAttribute('type') || '').toLowerCase();
-        if (type === 'text/babel' || type === 'text/jsx') {
-          await executeBabelScript(script);
-          return;
-        }
-
-        if (script.getAttribute('src')) {
-          await executeExternalScript(script);
-          return;
-        }
-
-        executeInlineScript(script);
-      }
-
-      async function mountWidget(options) {
-        const {
-          slotId,
-          systemKey,
-          defaultWidgetOrigin,
-          defaultApiOrigin,
-          errorTitle,
-        } = options;
-
-        const slot = document.getElementById(slotId);
-        if (!slot) {
-          return;
-        }
-
-        const launcherConfig = window.__LAUNCHER_CONFIG__ || {};
-        const systemsConfig = launcherConfig.systems || {};
-        const widgetConfig = (systemKey && systemsConfig[systemKey]) || {};
-
-        const widgetOrigin =
-          widgetConfig.widgetOrigin || slot.dataset.widgetOrigin || defaultWidgetOrigin;
-        const apiOrigin =
-          widgetConfig.apiOrigin || slot.dataset.apiOrigin || defaultApiOrigin || widgetOrigin;
-
-        try {
-          const widgetUrl = new URL('/widget', widgetOrigin);
-          if (apiOrigin) {
-            widgetUrl.searchParams.set('apiOrigin', apiOrigin);
-          }
-
-          const response = await fetch(widgetUrl);
-          if (!response.ok) {
-            throw new Error(`estado ${response.status}`);
-          }
-
-          const html = await response.text();
-          const template = document.createElement('template');
-          template.innerHTML = html.trim();
-          const fragment = template.content;
-
-          const scripts = [...fragment.querySelectorAll('script')];
-          for (const script of scripts) {
-            const src = script.getAttribute('src');
-            if (src) {
-              script.setAttribute('src', toAbsoluteUrl(src, widgetOrigin));
-            }
-          }
-
-          slot.replaceWith(fragment);
-
-          for (const script of scripts) {
-            await bootstrapScript(script);
-          }
-        } catch (error) {
-          slot.innerHTML = `
-            <article class="bg-white rounded-xl border border-rose-300/60 shadow-sm p-6">
-              <h3 class="text-base font-semibold text-rose-600 mb-2">${errorTitle}</h3>
-              <p class="text-sm text-rose-500">No se pudo cargar el microfrontend (${error.message}).</p>
-            </article>
-          `;
-        }
-      }
-
-      mountWidget({
-        slotId: 'nosql-db-widget-slot',
-        systemKey: 'nosqlDb',
-        defaultWidgetOrigin: 'http://127.0.0.1:4100',
-        errorTitle: 'Widget NoSQL no disponible',
-      });
-
-      mountWidget({
-        slotId: 'event-bus-widget-slot',
-        systemKey: 'eventBus',
-        defaultWidgetOrigin: 'http://127.0.0.1:4200',
-        errorTitle: 'Widget Event Bus no disponible',
-      });
-    </script>
+    <script type="module" src="/dashboard/scripts/sistemas-page.js"></script>
   </body>
 </html>
