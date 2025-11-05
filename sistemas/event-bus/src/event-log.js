@@ -130,6 +130,27 @@ class SimpleEventLog {
     return consumer;
   }
 
+  async listConsumers() {
+    await this._initPromise;
+
+    const files = await fs.readdir(this.consumersDir, { withFileTypes: true });
+    const consumerFiles = files.filter((entry) => entry.isFile() && isConsumerFile(entry.name));
+
+    const consumers = await Promise.all(
+      consumerFiles.map((entry) =>
+        readConsumerFile(path.join(this.consumersDir, entry.name)).then((data) => ({
+          name: data.name ?? entry.name.replace(/\.json$/u, ''),
+          offset: data.offset,
+          updatedAt: data.updatedAt,
+        }))
+      )
+    );
+
+    consumers.sort((a, b) => a.name.localeCompare(b.name));
+
+    return consumers;
+  }
+
   async reset() {
     await this._initPromise;
 
@@ -161,6 +182,7 @@ class EventConsumer {
 
   async _writeOffset(offset) {
     const payload = {
+      name: this.name,
       offset,
       updatedAt: new Date().toISOString(),
     };
@@ -199,12 +221,30 @@ class EventConsumer {
     await this._writeOffset(0);
   }
 
+  async getOffset() {
+    return this._readOffset();
+  }
+
   async _initialize() {
     await this.log._initPromise;
     if (!(await fileExists(this.offsetFile))) {
       await this._writeOffset(0);
     }
   }
+}
+
+function isConsumerFile(fileName) {
+  return fileName.endsWith('.json');
+}
+
+async function readConsumerFile(filePath) {
+  const raw = await fs.readFile(filePath, 'utf8');
+  const data = JSON.parse(raw);
+  return {
+    name: typeof data.name === 'string' && data.name.length > 0 ? data.name : null,
+    offset: Number.isInteger(data.offset) && data.offset >= 0 ? data.offset : 0,
+    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : null,
+  };
 }
 
 module.exports = {

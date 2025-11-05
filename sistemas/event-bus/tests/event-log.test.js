@@ -120,3 +120,37 @@ test('reset limpia el log y los offsets de consumidores', async (t) => {
   const newBatch = await consumer.poll();
   assert.equal(newBatch.length, 0);
 });
+
+test('listConsumers devuelve los consumidores registrados con metadatos', async (t) => {
+  const log = await createTempLog(t);
+  const consumerA = await log.createConsumer('facturacion');
+  const consumerB = await log.createConsumer('logistica');
+
+  await consumerA.commit(2);
+  await consumerB.reset();
+
+  const consumers = await log.listConsumers();
+  assert.equal(consumers.length, 2);
+
+  const names = consumers.map((item) => item.name).sort();
+  assert.deepEqual(names, ['facturacion', 'logistica']);
+
+  const billing = consumers.find((item) => item.name === 'facturacion');
+  assert.equal(billing.offset, 2);
+  assert.ok(typeof billing.updatedAt === 'string' && billing.updatedAt.length > 0);
+  assert.ok(!Number.isNaN(Date.parse(billing.updatedAt)));
+
+  const logistics = consumers.find((item) => item.name === 'logistica');
+  assert.equal(logistics.offset, 0);
+});
+
+test('EventConsumer#getOffset expone el offset persistido', async (t) => {
+  const log = await createTempLog(t);
+  const consumer = await log.createConsumer('atencion');
+
+  await log.append({ type: 'ticket.created' });
+  await consumer.poll();
+
+  const offset = await consumer.getOffset();
+  assert.equal(offset, 1);
+});
