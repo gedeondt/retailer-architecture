@@ -139,19 +139,23 @@
     return [quantities, updateQuantity];
   }
 
-  function useCheckoutForm() {
-    const [formData, setFormData] = useState({
-      customerFirstName: '',
-      customerLastName: '',
-      customerEmail: '',
-      customerPhone: '',
-      paymentCardHolder: '',
-      paymentCardNumber: '',
-      paymentCardExpiry: '',
-      paymentCardCvv: '',
+  function createDefaultFormData() {
+    return {
+      customerFirstName: 'Ana',
+      customerLastName: 'Pérez',
+      customerEmail: 'ana.perez@example.com',
+      customerPhone: '+34 600 123 123',
+      paymentCardHolder: 'Ana Pérez',
+      paymentCardNumber: '4242 4242 4242 4242',
+      paymentCardExpiry: '04/28',
+      paymentCardCvv: '123',
       currency: DEFAULT_CURRENCY,
       confirmedAt: new Date().toISOString().slice(0, 16),
-    });
+    };
+  }
+
+  function useCheckoutForm() {
+    const [formData, setFormData] = useState(createDefaultFormData);
 
     const updateField = (name, value) => {
       setFormData((previous) => ({
