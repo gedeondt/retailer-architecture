@@ -41,6 +41,20 @@
             id="sistemas-widgets-grid"
           >
             <div
+              id="event-bus-widget-slot"
+              class="col-span-1 xl:col-span-2"
+              data-widget-origin="http://127.0.0.1:4200"
+              data-api-origin="http://127.0.0.1:4200"
+              role="status"
+              aria-live="polite"
+            >
+              <article
+                class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex items-center justify-center"
+              >
+                <p class="text-sm text-slate-500">Cargando widget Event Bus…</p>
+              </article>
+            </div>
+            <div
               id="nosql-db-widget-slot"
               class="col-span-1"
               data-widget-origin="http://127.0.0.1:4100"
@@ -170,19 +184,28 @@
         executeInlineScript(script);
       }
 
-      async function mountNosqlWidget() {
-        const slot = document.getElementById('nosql-db-widget-slot');
+      async function mountWidget(options) {
+        const {
+          slotId,
+          systemKey,
+          defaultWidgetOrigin,
+          defaultApiOrigin,
+          errorTitle,
+        } = options;
+
+        const slot = document.getElementById(slotId);
         if (!slot) {
           return;
         }
 
         const launcherConfig = window.__LAUNCHER_CONFIG__ || {};
-        const nosqlConfig =
-          (launcherConfig.systems && launcherConfig.systems.nosqlDb) || {};
+        const systemsConfig = launcherConfig.systems || {};
+        const widgetConfig = (systemKey && systemsConfig[systemKey]) || {};
 
         const widgetOrigin =
-          nosqlConfig.widgetOrigin || slot.dataset.widgetOrigin || 'http://127.0.0.1:4100';
-        const apiOrigin = nosqlConfig.apiOrigin || slot.dataset.apiOrigin || widgetOrigin;
+          widgetConfig.widgetOrigin || slot.dataset.widgetOrigin || defaultWidgetOrigin;
+        const apiOrigin =
+          widgetConfig.apiOrigin || slot.dataset.apiOrigin || defaultApiOrigin || widgetOrigin;
 
         try {
           const widgetUrl = new URL('/widget', widgetOrigin);
@@ -216,14 +239,26 @@
         } catch (error) {
           slot.innerHTML = `
             <article class="bg-white rounded-xl border border-rose-300/60 shadow-sm p-6">
-              <h3 class="text-base font-semibold text-rose-600 mb-2">Widget NoSQL no disponible</h3>
+              <h3 class="text-base font-semibold text-rose-600 mb-2">${errorTitle}</h3>
               <p class="text-sm text-rose-500">No se pudo cargar el microfrontend (${error.message}).</p>
             </article>
           `;
         }
       }
 
-      mountNosqlWidget();
+      mountWidget({
+        slotId: 'nosql-db-widget-slot',
+        systemKey: 'nosqlDb',
+        defaultWidgetOrigin: 'http://127.0.0.1:4100',
+        errorTitle: 'Widget NoSQL no disponible',
+      });
+
+      mountWidget({
+        slotId: 'event-bus-widget-slot',
+        systemKey: 'eventBus',
+        defaultWidgetOrigin: 'http://127.0.0.1:4200',
+        errorTitle: 'Widget Event Bus no disponible',
+      });
     </script>
   </body>
 </html>

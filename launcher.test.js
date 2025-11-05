@@ -39,20 +39,25 @@ test('startLauncher sirve páginas independientes para cada sección', async (t)
   assert.match(sistemasBody, /Sistemas transversales/);
   assert.match(sistemasBody, /id="nosql-db-widget-slot"/);
   assert.match(sistemasBody, /Cargando widget NoSQL…/);
+  assert.match(sistemasBody, /id="event-bus-widget-slot"/);
+  assert.match(sistemasBody, /Cargando widget Event Bus…/);
 });
 
-test('startLauncher inyecta la configuración del widget NoSQL en la página de sistemas', async (t) => {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-config-'));
+test('startLauncher inyecta la configuración de los widgets de sistemas en la página', async (t) => {
+  const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-config-'));
+  const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-config-'));
   const { url, close, systems } = await startLauncher({
     port: 0,
     systemsConfig: {
-      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: tempDir },
+      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: nosqlDir },
+      eventBus: { port: 0, host: '127.0.0.1', dataDir: eventBusDir },
     },
   });
 
   t.after(async () => {
     await close();
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(nosqlDir, { recursive: true, force: true });
+    await fs.rm(eventBusDir, { recursive: true, force: true });
   });
 
   const response = await fetch(new URL('/sistemas.html', url));
@@ -68,6 +73,15 @@ test('startLauncher inyecta la configuración del widget NoSQL en la página de 
     body.includes(`"apiOrigin":"${systems.nosql.url}`),
     'se expone el origen de la API de NoSQL',
   );
+  assert.ok(systems.eventBus, 'se obtiene la instancia del servicio Event Bus');
+  assert.ok(
+    body.includes(`"widgetOrigin":"${systems.eventBus.url}`),
+    'se expone el origen del widget Event Bus',
+  );
+  assert.ok(
+    body.includes(`"apiOrigin":"${systems.eventBus.url}`),
+    'se expone el origen de la API del Event Bus',
+  );
 });
 
 test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
@@ -78,17 +92,20 @@ test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
 });
 
 test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-'));
+  const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-'));
+  const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-'));
   const { close, systems } = await startLauncher({
     port: 0,
     systemsConfig: {
-      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: tempDir },
+      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: nosqlDir },
+      eventBus: { port: 0, host: '127.0.0.1', dataDir: eventBusDir },
     },
   });
 
   t.after(async () => {
     await close();
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(nosqlDir, { recursive: true, force: true });
+    await fs.rm(eventBusDir, { recursive: true, force: true });
   });
 
   assert.ok(systems.nosql, 'se obtiene la instancia del servicio NoSQL');
@@ -102,34 +119,28 @@ test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
   assert.equal(payload.storage.usedBytes, 0);
 });
 
-test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
-  const { url, close } = await startLauncher({ startSystems: false });
-  t.after(close);
-
-  assert.match(url, /:3000\//);
-});
-
-test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-'));
+test('startLauncher inicia el servicio Event Bus por defecto', async (t) => {
+  const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-eventbus-'));
+  const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-'));
   const { close, systems } = await startLauncher({
     port: 0,
     systemsConfig: {
-      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: tempDir },
+      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: nosqlDir },
+      eventBus: { port: 0, host: '127.0.0.1', dataDir: eventBusDir },
     },
   });
 
   t.after(async () => {
     await close();
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(nosqlDir, { recursive: true, force: true });
+    await fs.rm(eventBusDir, { recursive: true, force: true });
   });
 
-  assert.ok(systems.nosql, 'se obtiene la instancia del servicio NoSQL');
+  assert.ok(systems.eventBus, 'se obtiene la instancia del servicio Event Bus');
 
-  const response = await fetch(new URL('/collections', systems.nosql.url));
+  const response = await fetch(new URL('/overview', systems.eventBus.url));
   assert.equal(response.status, 200);
   const payload = await response.json();
-  assert.deepEqual(payload.items, []);
-  assert.equal(payload.totalCollections, 0);
-  assert.ok(payload.storage);
-  assert.equal(payload.storage.usedBytes, 0);
+  assert.equal(payload.totalEvents, 0);
+  assert.deepEqual(payload.recentEvents, []);
 });
