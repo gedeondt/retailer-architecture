@@ -88,3 +88,51 @@ test('CollectionStore valida el campo de índice requerido', async (t) => {
     },
   );
 });
+
+test('CollectionStore impide inserciones cuando se supera el límite de almacenamiento', async (t) => {
+  const tempDir = await createTempDir('nosql-store-capacity-');
+  t.after(() => fs.rm(tempDir, { recursive: true, force: true }));
+
+  const store = new CollectionStore({ baseDir: tempDir, maxStorageBytes: 1_024 });
+  await store.initialize();
+  await store.createCollection({ name: 'archivos', indexField: 'clave' });
+
+  await store.addItem('archivos', { clave: 'a', contenido: 'x'.repeat(400) });
+
+  await assert.rejects(
+    () => store.addItem('archivos', { clave: 'b', contenido: 'y'.repeat(600) }),
+    (error) => {
+      assert(error instanceof CollectionError);
+      assert.equal(error.status, 507);
+      assert.match(error.message, /límite de almacenamiento/i);
+      return true;
+    },
+  );
+
+  const stats = store.getStorageStats();
+  assert(stats.usedBytes <= stats.limitBytes);
+  assert(stats.freeBytes >= 0);
+});
+
+test('CollectionStore también restringe actualizaciones que exceden el espacio disponible', async (t) => {
+  const tempDir = await createTempDir('nosql-store-update-capacity-');
+  t.after(() => fs.rm(tempDir, { recursive: true, force: true }));
+
+  const store = new CollectionStore({ baseDir: tempDir, maxStorageBytes: 500 });
+  await store.initialize();
+  await store.createCollection({ name: 'documentos', indexField: 'clave' });
+
+  const created = await store.addItem('documentos', { clave: 'doc-1', contenido: 'z'.repeat(300) });
+
+  await assert.rejects(
+    () => store.updateItem('documentos', created.id, { clave: 'doc-1', contenido: 'w'.repeat(700) }),
+    (error) => {
+      assert(error instanceof CollectionError);
+      assert.equal(error.status, 507);
+      return true;
+    },
+  );
+
+  const afterStats = store.getStorageStats();
+  assert(afterStats.usedBytes <= afterStats.limitBytes);
+});

@@ -123,7 +123,8 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
 
     if (url.pathname === '/collections') {
       const summaries = store.getCollectionSummaries();
-      sendJson(res, 200, { items: summaries, totalCollections: summaries.length }, corsHeaders);
+      const storage = store.getStorageStats();
+      sendJson(res, 200, { items: summaries, totalCollections: summaries.length, storage }, corsHeaders);
       return;
     }
   }
