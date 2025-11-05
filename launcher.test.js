@@ -41,6 +41,35 @@ test('startLauncher sirve páginas independientes para cada sección', async (t)
   assert.match(sistemasBody, /Cargando widget NoSQL…/);
 });
 
+test('startLauncher inyecta la configuración del widget NoSQL en la página de sistemas', async (t) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-config-'));
+  const { url, close, systems } = await startLauncher({
+    port: 0,
+    systemsConfig: {
+      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: tempDir },
+    },
+  });
+
+  t.after(async () => {
+    await close();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  const response = await fetch(new URL('/sistemas.html', url));
+  assert.equal(response.status, 200);
+  const body = await response.text();
+
+  assert.ok(body.includes('window.__LAUNCHER_CONFIG__'), 'se inyecta la configuración global');
+  assert.ok(
+    body.includes(`"widgetOrigin":"${systems.nosql.url}`),
+    'se expone el origen del widget NoSQL',
+  );
+  assert.ok(
+    body.includes(`"apiOrigin":"${systems.nosql.url}`),
+    'se expone el origen de la API de NoSQL',
+  );
+});
+
 test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
   const { url, close } = await startLauncher({ startSystems: false });
   t.after(close);
