@@ -66,3 +66,45 @@ node launcher.js
 ```
 
 El comando imprimirá en consola la URL local del dashboard. Al abrirla en el navegador se podrá validar la composición visual del panel maestro y desplazarse entre las distintas páginas mediante los enlaces del menú superior.
+
+## Ejemplo de microfront HelloWorld
+
+Para facilitar que los equipos creen nuevos microfronts con la misma apariencia que el widget de la base NoSQL, se define un servicio de referencia `helloworld`. El objetivo es clonar la estructura del microfront existente y limitarse a cambiar el contenido del cliente.
+
+### Estructura recomendada del servicio
+
+```
+sistemas/
+  helloworld/
+    package.json
+    src/
+      server.js
+      widget-shell.js
+      widget-client.jsx
+    tests/
+      server.test.js
+      widget-shell.test.js
+```
+
+- **`src/server.js`** expone dos rutas: `GET /widget` para servir el HTML del microfront y `GET /widget/client.jsx` para entregar el cliente React. Puede basarse en [`sistemas/nosql-db/src/server.js`](sistemas/nosql-db/src/server.js) reutilizando la configuración de CORS, los headers de caché y el registro del widget shell.
+- **`src/widget-shell.js`** genera el fragmento HTML con los mismos metadatos (`data-widget-id`, `data-widget-size`) y un contenedor raíz (`<div id="helloworld-root">`). Puede copiarse de [`sistemas/nosql-db/src/widget-shell.js`](sistemas/nosql-db/src/widget-shell.js) cambiando únicamente los identificadores y el texto visible.
+- **`src/widget-client.jsx`** monta el contenido en `#helloworld-root`. Un ejemplo mínimo sería:
+
+  ```jsx
+  const root = document.getElementById('helloworld-root');
+  const App = () => <h2 className="text-2xl font-semibold">Hello world!</h2>;
+  ReactDOM.createRoot(root).render(<App />);
+  ```
+
+### Pruebas sugeridas
+
+- Duplicar las pruebas de [`sistemas/nosql-db/tests/server.test.js`](sistemas/nosql-db/tests/server.test.js) y [`sistemas/nosql-db/tests/collection-store.test.js`](sistemas/nosql-db/tests/collection-store.test.js), ajustando los nombres de los endpoints y del widget para comprobar que se sirven los recursos esperados.
+- Añadir un `widget-shell.test.js` que valide que `renderWidgetShell()` incluye `data-widget-id="sistemas-helloworld"` y monta el cliente en el elemento correcto.
+
+### Instalación y ejecución
+
+1. Crear el paquete con `npm init -y` y copiar los scripts `start` y `test` del servicio NoSQL.
+2. Ejecutar `npm install` para instalar las dependencias compartidas (`express`, `cors`, `supertest`, `react`, `react-dom`).
+3. Registrar el microfront en el `launcher` añadiendo la ruta del servicio `helloworld` y referenciando su `renderWidgetShell()`.
+
+Este ejemplo funciona como plantilla para que cualquier nuevo microfront mantenga la misma envoltura visual, rutas y convenciones del ecosistema.
