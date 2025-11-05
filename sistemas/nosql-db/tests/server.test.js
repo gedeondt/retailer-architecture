@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -10,6 +11,24 @@ const { startNosqlService, renderWidgetShell } = require('../src/server');
 
 async function createTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
+}
+
+async function rawRequest(url, { method = 'GET', headers = {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(url, { method, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers,
+          body: Buffer.concat(chunks),
+        });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 test('startNosqlService expone la API CRUD y de búsqueda', async (t) => {
@@ -72,6 +91,37 @@ test('startNosqlService expone la API CRUD y de búsqueda', async (t) => {
   const widgetSource = await response.text();
   assert.match(widgetSource, /<WidgetHeader/);
   assert.match(widgetSource, /<NosqlCollectionsWidget \/>/);
+});
+
+test('la API expone cabeceras CORS y responde preflight', async (t) => {
+  const tempDir = await createTempDir('nosql-server-cors-');
+  const { url, close } = await startNosqlService({ port: 0, dataDir: tempDir });
+
+  t.after(async () => {
+    await close();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  const origin = 'http://launcher.test';
+
+  const widgetResponse = await rawRequest(new URL('/widget', url), { headers: { Origin: origin } });
+  assert.equal(widgetResponse.statusCode, 200);
+  assert.equal(widgetResponse.headers['access-control-allow-origin'], origin);
+  assert.equal(widgetResponse.headers['vary'], 'Origin');
+
+  const preflightResponse = await rawRequest(new URL('/collections', url), {
+    method: 'OPTIONS',
+    headers: {
+      Origin: origin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type',
+    },
+  });
+
+  assert.equal(preflightResponse.statusCode, 204);
+  assert.equal(preflightResponse.headers['access-control-allow-origin'], origin);
+  assert.equal(preflightResponse.headers['access-control-allow-methods'], 'GET,POST,PUT,DELETE,OPTIONS');
+  assert.equal(preflightResponse.headers['access-control-allow-headers'], 'content-type');
 });
 
 test('renderWidgetShell genera un fragmento de widget listo para React', () => {
