@@ -2,6 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 
 const { startLauncher, createDashboardHTML } = require('./launcher');
 
@@ -15,7 +18,7 @@ test('createDashboardHTML lee la página principal desde el sistema de archivos'
 });
 
 test('startLauncher sirve páginas independientes para cada sección', async (t) => {
-  const { url, close } = await startLauncher({ port: 0 });
+  const { url, close } = await startLauncher({ port: 0, startSystems: false });
   t.after(close);
 
   const homeResponse = await fetch(url);
@@ -35,4 +38,33 @@ test('startLauncher sirve páginas independientes para cada sección', async (t)
   const sistemasBody = await sistemasResponse.text();
   assert.match(sistemasBody, /Sistemas transversales/);
   assert.match(sistemasBody, /Bus de eventos/);
+});
+
+test('startLauncher utiliza el puerto 3000 por defecto', async (t) => {
+  const { url, close } = await startLauncher({ startSystems: false });
+  t.after(close);
+
+  assert.match(url, /:3000\//);
+});
+
+test('startLauncher inicia el servicio NoSQL por defecto', async (t) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-'));
+  const { close, systems } = await startLauncher({
+    port: 0,
+    systemsConfig: {
+      nosqlDb: { port: 0, host: '127.0.0.1', dataDir: tempDir },
+    },
+  });
+
+  t.after(async () => {
+    await close();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  assert.ok(systems.nosql, 'se obtiene la instancia del servicio NoSQL');
+
+  const response = await fetch(new URL('/collections', systems.nosql.url));
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload, { items: [], totalCollections: 0 });
 });

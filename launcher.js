@@ -4,6 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs');
 const { once } = require('node:events');
+const { startNosqlService } = require('./sistemas/nosql-db/src/server');
 
 const DASHBOARD_DIR = path.join(__dirname, 'dashboard');
 const PAGE_MAP = new Map([
@@ -41,7 +42,21 @@ function createDashboardHTML() {
 }
 
 async function startLauncher(options = {}) {
-  const { port = 0, host = '127.0.0.1' } = options;
+  const {
+    port = 3000,
+    host = '127.0.0.1',
+    startSystems = true,
+    systemsConfig = {},
+  } = options;
+
+  const launchedSystems = [];
+  let nosqlService = null;
+
+  if (startSystems) {
+    nosqlService = await startNosqlService({ ...(systemsConfig.nosqlDb ?? {}) });
+    launchedSystems.push(nosqlService);
+  }
+
   const server = http.createServer((req, res) => {
     if (req.method !== 'GET') {
       res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -76,7 +91,7 @@ async function startLauncher(options = {}) {
   const resolvedHost = addressInfo.address === '::' ? 'localhost' : addressInfo.address;
   const url = `http://${resolvedHost}:${addressInfo.port}/`;
 
-  const close = () =>
+  const closeServer = () =>
     new Promise((resolve, reject) => {
       server.close((error) => {
         if (error) {
@@ -87,7 +102,12 @@ async function startLauncher(options = {}) {
       });
     });
 
-  return { url, close, server };
+  const close = async () => {
+    await Promise.allSettled(launchedSystems.map((system) => system.close()));
+    await closeServer();
+  };
+
+  return { url, close, server, systems: { nosql: nosqlService } };
 }
 
 module.exports = {
