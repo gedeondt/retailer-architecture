@@ -16,5 +16,11 @@ test('el cliente del widget define los productos base y la estructura del evento
   assert.match(source, /createRoot\(container\)/, 'monta el widget utilizando ReactDOM.createRoot');
   assert.match(source, /customerFirstName/, 'solicita el nombre del cliente');
   assert.match(source, /paymentCardNumber/, 'solicita los datos de tarjeta para el pago');
-  assert.ok(!/orderId/.test(source), 'no requiere ingresar manualmente el identificador del pedido');
+  assert.ok(
+    !/onFieldChange\('orderId'/.test(source) && !/name="orderId"/.test(source),
+    'no requiere ingresar manualmente el identificador del pedido',
+  );
+  assert.match(source, /DEFAULT_API_ORIGIN/, 'define un origen por defecto para el servicio de ecommerce');
+  assert.match(source, /Enviar pedido/, 'incluye el botón para enviar el payload del checkout');
+  assert.match(source, /fetch\(/, 'publica la orden en el servicio de ecommerce');
 });
