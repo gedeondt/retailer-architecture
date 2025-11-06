@@ -12,6 +12,22 @@ const { renderWidgetShell, WIDGET_CLIENT_PATH } = require('./widget-shell');
 const DEFAULT_PORT = 4100;
 const DEFAULT_HOST = '127.0.0.1';
 const MAX_BODY_SIZE_BYTES = 1024 * 1024;
+const LOG_PREFIX = '[nosql-db]';
+
+function logInfo(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.info(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logDebug(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.debug(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logError(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.error(`${LOG_PREFIX} ${message}`, ...args);
+}
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -103,7 +119,10 @@ function extractCollectionParams(pathname) {
 }
 
 async function handleRequest(req, res, store, assets, corsHeaders) {
+  logDebug('Solicitud %s %s', req.method, req.url ?? '/');
+
   if (req.method === 'OPTIONS') {
+    logDebug('Respuesta a preflight para %s', req.url ?? '/');
     sendNoContent(res, corsHeaders);
     return;
   }
@@ -112,11 +131,13 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/widget') {
       const apiOrigin = url.searchParams.get('apiOrigin') || undefined;
+      logInfo('Sirviendo widget shell (apiOrigin=%s)', apiOrigin ?? 'local');
       sendText(res, 200, renderWidgetShell({ apiOrigin }), 'text/html; charset=utf-8', corsHeaders);
       return;
     }
 
     if (url.pathname === WIDGET_CLIENT_PATH) {
+      logDebug('Entregando cliente del widget');
       sendText(res, 200, assets.widgetClientScript, 'text/plain; charset=utf-8', corsHeaders);
       return;
     }
@@ -124,6 +145,7 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
     if (url.pathname === '/collections') {
       const summaries = store.getCollectionSummaries();
       const storage = store.getStorageStats();
+      logInfo('Listando colecciones registradas (%d)', summaries.length);
       sendJson(res, 200, { items: summaries, totalCollections: summaries.length, storage }, corsHeaders);
       return;
     }
@@ -134,6 +156,7 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
     if (url.pathname === '/collections') {
       const body = await readRequestBody(req);
       const collection = await store.createCollection(body);
+      logInfo('Colección creada: %s (índice: %s)', collection.name, collection.indexField);
       sendJson(res, 201, collection, corsHeaders);
       return;
     }
@@ -154,6 +177,7 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
   if (req.method === 'POST' && action === 'items' && !maybeId) {
     const body = await readRequestBody(req);
     const result = await store.addItem(collectionName, body);
+    logInfo('Insertado documento en %s con id %s', collectionName, result.id);
     sendJson(res, 201, result, corsHeaders);
     return;
   }
@@ -161,12 +185,14 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
   if (req.method === 'GET' && action === 'items' && !maybeId) {
     const { page, pageSize } = parsePagination(url.searchParams.get('page'), url.searchParams.get('pageSize'));
     const result = await store.listItems(collectionName, { page, pageSize });
+    logDebug('Listando documentos de %s (page=%d, pageSize=%d)', collectionName, result.page, result.pageSize);
     sendJson(res, 200, result, corsHeaders);
     return;
   }
 
   if (req.method === 'GET' && action === 'items' && maybeId) {
     const result = await store.getItem(collectionName, maybeId);
+    logDebug('Recuperado documento %s de %s', maybeId, collectionName);
     sendJson(res, 200, result, corsHeaders);
     return;
   }
@@ -174,12 +200,14 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
   if (req.method === 'PUT' && action === 'items' && maybeId) {
     const body = await readRequestBody(req);
     const result = await store.updateItem(collectionName, maybeId, body);
+    logInfo('Actualizado documento %s en %s', maybeId, collectionName);
     sendJson(res, 200, result, corsHeaders);
     return;
   }
 
   if (req.method === 'DELETE' && action === 'items' && maybeId) {
     const result = await store.deleteItem(collectionName, maybeId);
+    logInfo('Eliminado documento %s en %s', maybeId, collectionName);
     sendJson(res, 200, result, corsHeaders);
     return;
   }
@@ -188,6 +216,7 @@ async function handleRequest(req, res, store, assets, corsHeaders) {
     const query = url.searchParams.get('query');
     const { page, pageSize } = parsePagination(url.searchParams.get('page'), url.searchParams.get('pageSize'));
     const result = await store.searchItems(collectionName, query, { page, pageSize });
+    logDebug('Búsqueda en %s (query="%s", page=%d, pageSize=%d)', collectionName, query ?? '', result.page, result.pageSize);
     sendJson(res, 200, result, corsHeaders);
     return;
   }
@@ -220,7 +249,7 @@ async function startNosqlService(options = {}) {
           sendJson(res, error.status, { message: error.message }, corsHeaders);
           return;
         }
-        console.error('Error inesperado en la API NoSQL', error);
+        logError('Error inesperado en la API NoSQL', error);
         sendJson(res, 500, { message: 'Error interno del servidor' }, corsHeaders);
       })
       .finally(() => {
@@ -236,6 +265,8 @@ async function startNosqlService(options = {}) {
   const address = server.address();
   const resolvedHost = address.address === '::' ? 'localhost' : address.address;
   const url = `http://${resolvedHost}:${address.port}`;
+
+  logInfo('Servicio HTTP escuchando en %s', url);
 
   const close = () =>
     new Promise((resolve, reject) => {
@@ -260,10 +291,10 @@ module.exports = {
 if (require.main === module) {
   startNosqlService()
     .then(({ url }) => {
-      console.log(`Servicio NoSQL disponible en ${url}`);
+      logInfo('Servicio NoSQL disponible en %s', url);
     })
     .catch((error) => {
-      console.error('No se pudo iniciar el servicio NoSQL', error);
+      logError('No se pudo iniciar el servicio NoSQL', error);
       process.exitCode = 1;
     });
 }

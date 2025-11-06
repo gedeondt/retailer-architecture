@@ -112,6 +112,16 @@ Cada documento se guarda como archivo independiente (`<uuid>.json`). El store ll
 - La capa HTTP transforma los errores en respuestas JSON `{ "message": "..." }`.
 - `readRequestBody` limita el tamaño máximo del cuerpo a 1 MiB y requiere `Content-Type: application/json`.
 
+## Observabilidad y logs
+
+El servicio emite logs estructurados (prefijo `[nosql-db]`) que el launcher captura automáticamente:
+
+- Cada petición HTTP queda registrada con nivel `debug` indicando método y ruta.
+- Operaciones relevantes (`crear colección`, `insertar/actualizar/borrar documentos`, `búsquedas`) generan logs `info` con los identificadores involucrados.
+- Los errores no controlados se registran con nivel `error` antes de responder `500`.
+
+Cuando se ejecuta a través de `launcher.js`, estos mensajes aparecen en el visor de logs del dashboard bajo el servicio `nosql-db`.
+
 ## Datos de prueba
 
 El directorio `sistemas/nosql-db/data/` se limpia al iniciar el servicio. Añade un `.gitkeep` si necesitas conservar la carpeta en repositorios nuevos.

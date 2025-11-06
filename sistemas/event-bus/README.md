@@ -127,6 +127,16 @@ El endpoint `poll` devuelve `{ name, channel, items, committedOffset, lastDelive
 - `GET /widget`: entrega el HTML del widget (`renderWidgetShell`). Acepta `?apiOrigin=<url>` para forzar el origen de las APIs.
 - `GET /widget/client.jsx`: expone el cliente React que renderiza el widget (sin caché).
 
+## Observabilidad y logs
+
+Durante su ejecución el servicio escribe logs con el prefijo `[event-bus]` que quedan disponibles en el visor del launcher:
+
+- Cada petición HTTP registra un log `debug` con el método y la ruta recibida (incluidos los preflight `OPTIONS`).
+- Operaciones exitosas sobre `/events` y `/consumers` generan mensajes `info` describiendo el canal, consumidor o identificador afectado.
+- Los errores inesperados quedan registrados con nivel `error` antes de responder con `500`.
+
+Estos mensajes permiten verificar desde el dashboard si se están publicando eventos, leyendo consumidores o consultando métricas sin inspeccionar manualmente la consola.
+
 ## Widget para el dashboard
 
 `renderWidgetShell()` genera un fragmento HTML con `data-widget-id="sistemas-event-bus"`, tamaño `col-span-2` y un contenedor `#event-bus-root`. El widget cliente consume `/overview` cada 15 segundos, muestra:
