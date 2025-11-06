@@ -11,6 +11,7 @@ const { startEventBusService } = require('../../../../../sistemas/event-bus/src/
 const {
   CrmSyncProcessor,
   DEFAULT_COLLECTION,
+  DEFAULT_COLLECTIONS,
   DEFAULT_EVENT_CHANNEL,
 } = require('../src/crm-sync-processor');
 const { startCrmService } = require('../src/server');
@@ -41,7 +42,15 @@ async function publishOrderConfirmed(eventBusUrl, payload) {
   assert.equal(response.status, 201, 'publica el evento OrderConfirmed');
 }
 
-test('CrmSyncProcessor crea y actualiza clientes a partir de eventos OrderConfirmed', async (t) => {
+function findBy(collectionItems, predicate) {
+  return collectionItems.find((entry) => predicate(entry.value));
+}
+
+const ORDERS_COLLECTION = DEFAULT_COLLECTIONS.orders.name;
+const ORDER_ITEMS_COLLECTION = DEFAULT_COLLECTIONS.orderItems.name;
+const ORDER_PAYMENTS_COLLECTION = DEFAULT_COLLECTIONS.orderPayments.name;
+
+test('CrmSyncProcessor crea y actualiza clientes y réplicas de pedidos a partir de eventos OrderConfirmed', async (t) => {
   const { nosql, eventBus } = await startInfrastructure(t);
 
   const processor = new CrmSyncProcessor({
@@ -113,6 +122,41 @@ test('CrmSyncProcessor crea y actualiza clientes a partir de eventos OrderConfir
   assert.equal(customerRecord.orders[0].orderId, 'ORDER-1');
   assert.equal(customerRecord.orders[0].items.length, 1);
 
+  const ordersSearchResponse = await fetch(
+    new URL(`/collections/${ORDERS_COLLECTION}/search?query=ORDER-1`, nosql.url),
+  );
+  assert.equal(ordersSearchResponse.status, 200);
+  const ordersSearchPayload = await ordersSearchResponse.json();
+  assert.equal(ordersSearchPayload.items.length, 1, 'replica el pedido en la colección dedicada');
+  const orderReplica = ordersSearchPayload.items[0].value;
+  assert.equal(orderReplica.orderId, 'ORDER-1');
+  assert.equal(orderReplica.customerId, 'CUSTOMER-1');
+  assert.equal(orderReplica.paymentId, 'PAY-1');
+  assert.equal(orderReplica.paymentMethod, 'credit_card');
+  assert.equal(orderReplica.itemsCount, 1);
+
+  const itemsListResponse = await fetch(
+    new URL(`/collections/${ORDER_ITEMS_COLLECTION}/items?page=1&pageSize=10`, nosql.url),
+  );
+  assert.equal(itemsListResponse.status, 200);
+  const itemsListPayload = await itemsListResponse.json();
+  assert.equal(itemsListPayload.totalItems, 1, 'replica los ítems del pedido');
+  const replicatedItem = itemsListPayload.items[0].value;
+  assert.equal(replicatedItem.itemId, 'LINE-1');
+  assert.equal(replicatedItem.orderId, 'ORDER-1');
+  assert.equal(replicatedItem.sku, 'SKU-GUITAR-01');
+
+  const paymentsSearchResponse = await fetch(
+    new URL(`/collections/${ORDER_PAYMENTS_COLLECTION}/search?query=PAY-1`, nosql.url),
+  );
+  assert.equal(paymentsSearchResponse.status, 200);
+  const paymentsSearchPayload = await paymentsSearchResponse.json();
+  assert.equal(paymentsSearchPayload.items.length, 1, 'replica el pago del pedido');
+  const replicatedPayment = paymentsSearchPayload.items[0].value;
+  assert.equal(replicatedPayment.paymentId, 'PAY-1');
+  assert.equal(replicatedPayment.orderId, 'ORDER-1');
+  assert.equal(replicatedPayment.method, 'credit_card');
+
   const secondEvent = {
     order: {
       id: 'ORDER-2',
@@ -120,8 +164,8 @@ test('CrmSyncProcessor crea y actualiza clientes a partir de eventos OrderConfir
       status: 'confirmed',
       channelOrigin: 'app',
       paymentIds: ['PAY-2'],
-      confirmedAt: '2024-06-02T09:15:00.000Z',
-      total: { amount: 120.0, currency: 'EUR' },
+      confirmedAt: '2024-06-02T10:00:00.000Z',
+      total: { amount: 120, currency: 'EUR' },
     },
     customer: {
       id: 'CUSTOMER-1',
@@ -174,6 +218,27 @@ test('CrmSyncProcessor crea y actualiza clientes a partir de eventos OrderConfir
   assert.equal(refreshedRecord.lastOrderId, 'ORDER-2');
   assert.equal(refreshedRecord.lastOrder.payment.method, 'paypal');
 
+  const ordersListResponse = await fetch(
+    new URL(`/collections/${ORDERS_COLLECTION}/items?page=1&pageSize=10`, nosql.url),
+  );
+  assert.equal(ordersListResponse.status, 200);
+  const ordersListPayload = await ordersListResponse.json();
+  assert.equal(ordersListPayload.totalItems, 2, 'almacena ambos pedidos en la colección dedicada');
+  const orderTwoReplica = findBy(ordersListPayload.items, (value) => value.orderId === 'ORDER-2');
+  assert.ok(orderTwoReplica, 'existe la réplica del segundo pedido');
+  assert.equal(orderTwoReplica.value.paymentMethod, 'paypal');
+  assert.equal(orderTwoReplica.value.totalAmount, 120);
+
+  const paymentListResponse = await fetch(
+    new URL(`/collections/${ORDER_PAYMENTS_COLLECTION}/items?page=1&pageSize=10`, nosql.url),
+  );
+  assert.equal(paymentListResponse.status, 200);
+  const paymentListPayload = await paymentListResponse.json();
+  assert.equal(paymentListPayload.totalItems, 2, 'replica cada pago de los pedidos');
+  const secondPaymentReplica = findBy(paymentListPayload.items, (value) => value.paymentId === 'PAY-2');
+  assert.ok(secondPaymentReplica, 'almacena el pago del segundo pedido');
+  assert.equal(secondPaymentReplica.value.status, 'captured');
+
   const stats = processor.getStats();
   assert.ok(stats.lastSyncAt, 'registra la fecha de la última sincronización');
   assert.equal(stats.totalCustomersCreated, 1);
@@ -215,7 +280,16 @@ test('startCrmService expone endpoints HTTP para controlar la sincronización', 
       lastName: 'Pérez',
       email: 'lucia@example.com',
     },
-    items: [],
+    items: [
+      {
+        id: 'LINE-HTTP-1',
+        orderId: 'ORDER-HTTP-1',
+        sku: 'SKU-HEADPHONES',
+        quantity: 1,
+        unitPrice: 200,
+        lineTotal: 200,
+      },
+    ],
     payment: {
       id: 'PAY-HTTP-1',
       orderId: 'ORDER-HTTP-1',
@@ -255,7 +329,16 @@ test('startCrmService expone endpoints HTTP para controlar la sincronización', 
       lastName: 'Pérez',
       email: 'lucia@example.com',
     },
-    items: [],
+    items: [
+      {
+        id: 'LINE-HTTP-2',
+        orderId: 'ORDER-HTTP-2',
+        sku: 'SKU-STRINGS',
+        quantity: 3,
+        unitPrice: 40,
+        lineTotal: 120,
+      },
+    ],
     payment: {
       id: 'PAY-HTTP-2',
       orderId: 'ORDER-HTTP-2',
@@ -273,10 +356,12 @@ test('startCrmService expone endpoints HTTP para controlar la sincronización', 
   assert.equal(entitiesResponse.status, 200);
   const entitiesPayload = await entitiesResponse.json();
   assert.ok(Array.isArray(entitiesPayload.items));
-  assert.equal(entitiesPayload.totalEntities, 2);
+  assert.equal(entitiesPayload.totalEntities, 4, 'exponen todas las entidades autosuficientes');
+  const entityIds = entitiesPayload.items.map((entry) => entry.id).sort();
+  assert.deepEqual(entityIds, ['crm-customers', 'crm-order-items', 'crm-order-payments', 'crm-orders']);
   const customerEntity = entitiesPayload.items.find((entry) => entry.id === 'crm-customers');
   assert.ok(customerEntity, 'exponen la entidad de clientes');
-  assert.equal(customerEntity.fields.length, 4, 'cada entidad define cuatro columnas relevantes');
+  assert.equal(customerEntity.fields.length, 4, 'cada entidad define columnas relevantes');
 
   const customersResponse = await fetch(new URL('/entities/crm-customers?page=1&pageSize=5', url));
   assert.equal(customersResponse.status, 200);
@@ -296,11 +381,47 @@ test('startCrmService expone endpoints HTTP para controlar la sincronización', 
   assert.ok(ordersPayload.totalItems >= 2, 'agrega los pedidos sincronizados');
   assert.deepEqual(
     ordersPayload.entity.fields.map((field) => field.key),
-    ['orderId', 'customerId', 'status', 'confirmedAt'],
+    [
+      'orderId',
+      'customerId',
+      'status',
+      'channelOrigin',
+      'confirmedAt',
+      'totalAmount',
+      'totalCurrency',
+      'paymentMethod',
+      'paymentStatus',
+    ],
   );
   const orderIds = ordersPayload.items.map((item) => item.orderId);
   assert.ok(orderIds.includes('ORDER-HTTP-1'));
   assert.ok(orderIds.includes('ORDER-HTTP-2'));
+  const orderRow = ordersPayload.items.find((item) => item.orderId === 'ORDER-HTTP-2');
+  assert.equal(orderRow.paymentStatus, 'captured');
+
+  const orderItemsResponse = await fetch(new URL('/entities/crm-order-items?page=1&pageSize=10', url));
+  assert.equal(orderItemsResponse.status, 200);
+  const orderItemsPayload = await orderItemsResponse.json();
+  assert.ok(orderItemsPayload.totalItems >= 2, 'expone los ítems replicados');
+  assert.deepEqual(
+    orderItemsPayload.entity.fields.map((field) => field.key),
+    ['itemId', 'orderId', 'customerId', 'sku', 'quantity', 'unitPrice', 'lineTotal', 'promotions'],
+  );
+  const itemRow = orderItemsPayload.items.find((item) => item.orderId === 'ORDER-HTTP-2');
+  assert.equal(itemRow.sku, 'SKU-STRINGS');
+  assert.equal(itemRow.quantity, 3);
+
+  const paymentsResponse = await fetch(new URL('/entities/crm-order-payments?page=1&pageSize=10', url));
+  assert.equal(paymentsResponse.status, 200);
+  const paymentsPayload = await paymentsResponse.json();
+  assert.ok(paymentsPayload.totalItems >= 2, 'expone los pagos sincronizados');
+  assert.deepEqual(
+    paymentsPayload.entity.fields.map((field) => field.key),
+    ['paymentId', 'orderId', 'customerId', 'method', 'status', 'amount', 'currency'],
+  );
+  const paymentRow = paymentsPayload.items.find((item) => item.paymentId === 'PAY-HTTP-2');
+  assert.equal(paymentRow.status, 'captured');
+  assert.equal(paymentRow.amount, 120);
 
   const invalidEntityResponse = await fetch(new URL('/entities/unknown', url));
   assert.equal(invalidEntityResponse.status, 404);

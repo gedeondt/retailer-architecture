@@ -150,6 +150,10 @@ async function startCrmService(options = {}) {
     fetchImpl,
     nosqlUrl,
     collectionName: processor.collection?.name,
+    customersCollectionName: processor.collections?.customers?.name,
+    ordersCollectionName: processor.collections?.orders?.name,
+    orderItemsCollectionName: processor.collections?.orderItems?.name,
+    orderPaymentsCollectionName: processor.collections?.orderPayments?.name,
   });
 
   let intervalId = null;
