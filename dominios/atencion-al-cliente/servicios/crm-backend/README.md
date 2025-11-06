@@ -6,7 +6,7 @@ de Atención al Cliente.
 
 ## Capacidades
 
-- Asegura la colección `crm-customers` en la base documental NoSQL.
+- Asegura la colección `atencionalcliente-customers` en la base documental NoSQL.
 - Crea (o asegura) un consumidor dedicado sobre el canal `ventasdigitales.orders` del bus de
   eventos.
 - Procesa los eventos `OrderConfirmed` para dar de alta o actualizar a los clientes con la

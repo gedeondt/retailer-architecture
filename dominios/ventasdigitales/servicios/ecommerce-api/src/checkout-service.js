@@ -10,9 +10,9 @@ class CheckoutError extends Error {
 }
 
 const DEFAULT_COLLECTIONS = {
-  orders: { name: 'digital-orders', indexField: 'pedidoId' },
-  lines: { name: 'digital-order-lines', indexField: 'pedidoId' },
-  payments: { name: 'digital-order-payments', indexField: 'pagoId' },
+  orders: { name: 'ventasdigitales-orders', indexField: 'pedidoId' },
+  lines: { name: 'ventasdigitales-order-lines', indexField: 'pedidoId' },
+  payments: { name: 'ventasdigitales-order-payments', indexField: 'pagoId' },
 };
 
 const DEFAULT_EVENT_CHANNEL = 'ventasdigitales.orders';

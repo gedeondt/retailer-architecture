@@ -1,6 +1,6 @@
 'use strict';
 
-const DEFAULT_COLLECTION = { name: 'crm-customers', indexField: 'customerId' };
+const DEFAULT_COLLECTION = { name: 'atencionalcliente-customers', indexField: 'customerId' };
 const DEFAULT_EVENT_CHANNEL = 'ventasdigitales.orders';
 const DEFAULT_CONSUMER_NAME = 'crm-atencion-clientes';
 

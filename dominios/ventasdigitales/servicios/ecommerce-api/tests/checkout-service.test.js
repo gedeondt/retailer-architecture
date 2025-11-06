@@ -90,7 +90,7 @@ test('CheckoutProcessor persiste el pedido y publica OrderConfirmed', async (t) 
   assert.equal(eventPayload.items[0].unitPrice, payload.items[0].price);
 
   const ordersResponse = await fetch(
-    new URL(`/collections/digital-orders/items?page=1&pageSize=10`, nosql.url),
+    new URL(`/collections/ventasdigitales-orders/items?page=1&pageSize=10`, nosql.url),
   );
   assert.equal(ordersResponse.status, 200);
   const orders = await ordersResponse.json();
@@ -99,7 +99,7 @@ test('CheckoutProcessor persiste el pedido y publica OrderConfirmed', async (t) 
   assert.equal(orders.items[0].value.estado, 'confirmado');
 
   const linesResponse = await fetch(
-    new URL(`/collections/digital-order-lines/items?page=1&pageSize=10`, nosql.url),
+    new URL(`/collections/ventasdigitales-order-lines/items?page=1&pageSize=10`, nosql.url),
   );
   assert.equal(linesResponse.status, 200);
   const lines = await linesResponse.json();
@@ -107,7 +107,7 @@ test('CheckoutProcessor persiste el pedido y publica OrderConfirmed', async (t) 
   assert.equal(lines.items[0].value.pedidoId, result.orderId);
 
   const paymentsResponse = await fetch(
-    new URL(`/collections/digital-order-payments/items?page=1&pageSize=10`, nosql.url),
+    new URL(`/collections/ventasdigitales-order-payments/items?page=1&pageSize=10`, nosql.url),
   );
   assert.equal(paymentsResponse.status, 200);
   const payments = await paymentsResponse.json();
