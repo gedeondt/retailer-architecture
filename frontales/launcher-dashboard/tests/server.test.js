@@ -132,3 +132,67 @@ test('startDashboardServer expone el widget de ecommerce del dominio de ventas d
   assert.match(clientBody, /SKU-ACOUSTIC-01/);
   assert.match(clientBody, /OrderConfirmed/);
 });
+
+test('GET /api/logs responde sin emitir nuevos logs', async (t) => {
+  const originalConsole = {
+    info: console.info,
+    debug: console.debug,
+    warn: console.warn,
+    error: console.error,
+  };
+
+  const counters = { info: 0, debug: 0, warn: 0, error: 0 };
+
+  console.info = (...args) => {
+    counters.info += 1;
+    return originalConsole.info.call(console, ...args);
+  };
+  console.debug = (...args) => {
+    counters.debug += 1;
+    return originalConsole.debug.call(console, ...args);
+  };
+  console.warn = (...args) => {
+    counters.warn += 1;
+    return originalConsole.warn.call(console, ...args);
+  };
+  console.error = (...args) => {
+    counters.error += 1;
+    return originalConsole.error.call(console, ...args);
+  };
+
+  t.after(() => {
+    console.info = originalConsole.info;
+    console.debug = originalConsole.debug;
+    console.warn = originalConsole.warn;
+    console.error = originalConsole.error;
+  });
+
+  const fakeLogs = [{ message: 'hola', level: 'info', service: 'launcher', sequence: 1 }];
+  const logCollector = {
+    getLevels: () => ['info', 'error'],
+    getLogs: ({ service, level }) => {
+      assert.equal(service, 'launcher');
+      assert.equal(level, 'info');
+      return fakeLogs;
+    },
+    getServiceNames: () => ['launcher'],
+  };
+
+  const { url, close } = await startDashboardServer({ port: 0, logCollector });
+
+  t.after(close);
+
+  const before = { ...counters };
+  const response = await fetch(new URL('/api/logs?service=launcher&level=info', url));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body, {
+    items: fakeLogs,
+    totalItems: fakeLogs.length,
+    services: ['launcher'],
+    levels: ['info', 'error'],
+  });
+
+  const after = { ...counters };
+  assert.deepEqual(after, before, 'la petición no debe generar nuevos logs');
+});
