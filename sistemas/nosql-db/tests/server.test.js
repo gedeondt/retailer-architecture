@@ -169,7 +169,7 @@ test('la API expone cabeceras CORS y responde preflight', async (t) => {
 test('renderWidgetShell genera un fragmento de widget listo para el navegador', () => {
   const html = renderWidgetShell({ apiOrigin: 'http://example.test:1234' });
   assert.match(html, /data-widget-id="sistemas-nosql-db"/);
-  assert.match(html, /data-widget-size="1"/);
+  assert.match(html, /data-widget-size="2"/);
   assert.match(html, /data-api-origin="http:\/\/example\.test:1234"/);
   assert.match(html, /<script type="text\/babel" data-presets="react" src="\/widget\/client\.jsx"><\/script>/);
   assert.ok(!html.includes('<html'), 'no incluye el elemento html principal');
