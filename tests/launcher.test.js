@@ -66,6 +66,10 @@ test('startLauncher inicia los sistemas compartidos y expone su configuración',
     collectionNames.includes('digital-order-payments'),
     'crea la colección de pagos del pedido digital',
   );
+  assert.ok(
+    collectionNames.includes('crm-customers'),
+    'crea la colección de clientes del CRM al iniciar el servicio de atención al cliente',
+  );
 
   const eventBusResponse = await fetch(new URL('/overview?channel=general', systems.eventBus.url));
   assert.equal(eventBusResponse.status, 200);
@@ -173,8 +177,15 @@ test('startLauncher inicia la API de ecommerce y la conecta a los sistemas compa
   assert.ok(ecommerceService, 'expone el servicio de ecommerce en el launcher');
   assert.ok(ecommerceService.url, 'incluye la URL del servicio de ecommerce');
 
+  const crmBackendService = domains?.atencionAlCliente?.crmBackend;
+  assert.ok(crmBackendService, 'expone el servicio CRM en el launcher');
+  assert.ok(crmBackendService.url, 'incluye la URL del servicio CRM');
+
   const healthResponse = await fetch(new URL('/health', ecommerceService.url));
   assert.equal(healthResponse.status, 200);
+
+  const crmHealthResponse = await fetch(new URL('/health', crmBackendService.url));
+  assert.equal(crmHealthResponse.status, 200);
 
   const payload = {
     customer: {
@@ -212,7 +223,7 @@ test('startLauncher inicia la API de ecommerce y la conecta a los sistemas compa
   const orderBody = await orderResponse.json();
   assert.ok(orderBody.orderId, 'devuelve el identificador del pedido');
   assert.equal(orderBody.event.type, 'OrderConfirmed');
-  assert.equal(orderBody.event.payload.orderId, orderBody.orderId);
+  assert.equal(orderBody.event.payload.order.id, orderBody.orderId);
 
   const eventsResponse = await fetch(
     new URL('/events?channel=ventasdigitales.orders', systems.eventBus.url),
@@ -221,7 +232,7 @@ test('startLauncher inicia la API de ecommerce y la conecta a los sistemas compa
   const eventsData = await eventsResponse.json();
   assert.ok(eventsData.items.length >= 1, 'registra eventos en el canal de ventas digitales');
   assert.ok(
-    eventsData.items.some((event) => event.payload?.orderId === orderBody.orderId),
+    eventsData.items.some((event) => event.payload?.order?.id === orderBody.orderId),
     'el evento publicado corresponde al pedido confirmado',
   );
 });

@@ -4,6 +4,7 @@ const { startDashboardServer, createDashboardHTML } = require('./frontales/launc
 const { startNosqlService } = require('./sistemas/nosql-db/src/server');
 const { startEventBusService } = require('./sistemas/event-bus/src/server');
 const { startCheckoutService } = require('./dominios/ventasdigitales/servicios/ecommerce-api/src');
+const { startCrmService } = require('./dominios/atencion-al-cliente/servicios/crm-backend/src');
 const { createServiceLogCollector } = require('./lib/logging/service-log-collector');
 
 async function startLauncher(options = {}) {
@@ -25,6 +26,7 @@ async function startLauncher(options = {}) {
   let nosqlService = null;
   let eventBusService = null;
   let ecommerceApiService = null;
+  let crmService = null;
 
   try {
     if (startSystems) {
@@ -77,6 +79,48 @@ async function startLauncher(options = {}) {
         );
         launchedDomainServices.push(ecommerceApiService);
       }
+
+      const atencionConfig = domainServicesConfig.atencionAlCliente ?? {};
+      const crmConfig = atencionConfig.crmBackend ?? {};
+      if (crmConfig.startService !== false) {
+        const { startService: _ignoredCrm, ...serviceOptions } = crmConfig;
+
+        const crmNosqlUrl =
+          serviceOptions.nosqlUrl ??
+          nosqlService?.url ??
+          systemsConfig?.nosqlDb?.apiOrigin ??
+          systemsConfig?.nosqlDb?.widgetOrigin;
+        const crmEventBusUrl =
+          serviceOptions.eventBusUrl ??
+          eventBusService?.url ??
+          systemsConfig?.eventBus?.apiOrigin ??
+          systemsConfig?.eventBus?.widgetOrigin;
+
+        if (!crmNosqlUrl) {
+          throw new Error(
+            'No se pudo determinar la URL del servicio NoSQL para iniciar atencionalcliente-crm-backend.',
+          );
+        }
+
+        if (!crmEventBusUrl) {
+          throw new Error(
+            'No se pudo determinar la URL del Event Bus para iniciar atencionalcliente-crm-backend.',
+          );
+        }
+
+        crmService = await logCollector.withServiceContext('atencionalcliente-crm-backend', () =>
+          startCrmService({ ...serviceOptions, nosqlUrl: crmNosqlUrl, eventBusUrl: crmEventBusUrl }),
+        );
+        launchedDomainServices.push(crmService);
+      }
+    }
+
+    const runtimeDomains = {};
+    if (ecommerceApiService) {
+      runtimeDomains.ventasDigitales = { ecommerceApi: ecommerceApiService };
+    }
+    if (crmService) {
+      runtimeDomains.atencionAlCliente = { crmBackend: crmService };
     }
 
     const { url, close: closeServer, server } = await logCollector.withServiceContext(
@@ -86,9 +130,7 @@ async function startLauncher(options = {}) {
           port,
           host,
           runtimeSystems: { nosql: nosqlService, eventBus: eventBusService },
-          runtimeDomains: ecommerceApiService
-            ? { ventasDigitales: { ecommerceApi: ecommerceApiService } }
-            : {},
+          runtimeDomains,
           systemsConfig,
           domainServicesConfig,
           logCollector,
@@ -112,7 +154,7 @@ async function startLauncher(options = {}) {
       close,
       server,
       systems: { nosql: nosqlService, eventBus: eventBusService },
-      domains: ecommerceApiService ? { ventasDigitales: { ecommerceApi: ecommerceApiService } } : {},
+      domains: runtimeDomains,
       logs: logCollector,
     };
   } catch (error) {

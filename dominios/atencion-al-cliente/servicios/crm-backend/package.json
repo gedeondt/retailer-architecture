@@ -1,0 +1,14 @@
+{
+  "name": "@retailer/atencionalcliente-crm-backend",
+  "version": "0.1.0",
+  "description": "Servicio de sincronización CRM para Atención al Cliente",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
