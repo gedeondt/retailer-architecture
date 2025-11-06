@@ -1,6 +1,12 @@
 'use strict';
 
-function buildLauncherConfig({ nosqlService, eventBusService, systemsConfig }) {
+function buildLauncherConfig({
+  nosqlService,
+  eventBusService,
+  systemsConfig,
+  domainServices,
+  domainServicesConfig,
+}) {
   const systems = {};
 
   const providedNosql = systemsConfig?.nosqlDb ?? {};
@@ -35,11 +41,34 @@ function buildLauncherConfig({ nosqlService, eventBusService, systemsConfig }) {
     }
   }
 
-  if (Object.keys(systems).length === 0) {
+  const domains = {};
+
+  const providedEcommerce = domainServicesConfig?.ventasDigitales?.ecommerceApi ?? {};
+  const ecommerceApiOrigin = providedEcommerce.apiOrigin ?? domainServices?.ventasDigitales?.ecommerceApi?.url;
+
+  if (ecommerceApiOrigin) {
+    domains.ventasDigitales = {
+      ecommerceApi: {
+        apiOrigin: ecommerceApiOrigin,
+      },
+    };
+  }
+
+  const config = {};
+
+  if (Object.keys(systems).length > 0) {
+    config.systems = systems;
+  }
+
+  if (Object.keys(domains).length > 0) {
+    config.domains = domains;
+  }
+
+  if (Object.keys(config).length === 0) {
     return {};
   }
 
-  return { systems };
+  return config;
 }
 
 function injectLauncherConfig(html, config) {

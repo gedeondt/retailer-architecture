@@ -29,7 +29,9 @@ function logError(message, ...args) {
 function createLauncherApp(options = {}) {
   const {
     runtimeSystems = {},
+    runtimeDomains = {},
     systemsConfig = {},
+    domainServicesConfig = {},
     dashboardDir = getDashboardDir(),
     logCollector,
   } = options;
@@ -71,7 +73,11 @@ function createLauncherApp(options = {}) {
   app.get('/widgets/ventasdigitales/ecommerce/widget', (req, res, next) => {
     try {
       const apiOriginRaw = typeof req.query?.apiOrigin === 'string' ? req.query.apiOrigin : undefined;
-      const apiOrigin = apiOriginRaw && apiOriginRaw.trim() !== '' ? apiOriginRaw : undefined;
+      const runtimeApiOrigin = runtimeDomains?.ventasDigitales?.ecommerceApi?.url;
+      const providedApiOrigin =
+        domainServicesConfig?.ventasDigitales?.ecommerceApi?.apiOrigin ?? runtimeApiOrigin;
+      const apiOrigin =
+        apiOriginRaw && apiOriginRaw.trim() !== '' ? apiOriginRaw : providedApiOrigin ?? undefined;
       const html = renderEcommerceWidget({ apiOrigin });
       res.type('html').send(html);
     } catch (error) {
@@ -113,6 +119,8 @@ function createLauncherApp(options = {}) {
         nosqlService: runtimeSystems.nosql,
         eventBusService: runtimeSystems.eventBus,
         systemsConfig,
+        domainServices: runtimeDomains,
+        domainServicesConfig,
       });
       const enhancedHtml = injectLauncherConfig(html, launcherConfig);
       res.type('html').send(enhancedHtml);

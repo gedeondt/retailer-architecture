@@ -2,7 +2,9 @@ import dashboardWidgets from './widget-loader.js';
 
 function initDominiosWidgets() {
   const baseOrigin = window.location.origin.replace(/\/$/, '');
-  const defaultApiOrigin = 'http://127.0.0.1:4300';
+  const launcherConfig = window.__LAUNCHER_CONFIG__ || {};
+  const ecommerceConfig = launcherConfig.domains?.ventasDigitales?.ecommerceApi ?? {};
+  const defaultApiOrigin = ecommerceConfig.apiOrigin || 'http://127.0.0.1:4300';
   dashboardWidgets.mountWidget({
     slotId: 'ventasdigitales-ecommerce-widget-slot',
     defaultWidgetOrigin: `${baseOrigin}/widgets/ventasdigitales/ecommerce/`,
