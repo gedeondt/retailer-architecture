@@ -12,6 +12,22 @@ const { renderWidgetShell, WIDGET_CLIENT_PATH } = require('./widget-shell');
 const DEFAULT_PORT = 4200;
 const DEFAULT_HOST = '127.0.0.1';
 const MAX_BODY_SIZE_BYTES = 512 * 1024;
+const LOG_PREFIX = '[event-bus]';
+
+function logInfo(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.info(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logDebug(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.debug(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logError(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.error(`${LOG_PREFIX} ${message}`, ...args);
+}
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -175,6 +191,7 @@ async function handleEventsRoute(req, res, url, log, corsHeaders) {
         ? await log.getEventsSince(since, { channel: channelParam })
         : await log.listEvents({ channel: channelParam });
     const sliced = limit !== null ? events.slice(0, limit) : events;
+    logDebug('Listando eventos de %s (since=%s, limit=%s)', channelParam, since ?? '0', limit ?? '∞');
     sendJson(res, 200, { items: sliced }, corsHeaders);
     return;
   }
@@ -189,12 +206,14 @@ async function handleEventsRoute(req, res, url, log, corsHeaders) {
       type: body.type ?? null,
       payload: body.payload ?? null,
     });
+    logInfo('Evento publicado en %s con id %d', record.channel, record.id);
     sendJson(res, 201, record, corsHeaders);
     return;
   }
 
   if (req.method === 'DELETE') {
     await log.reset();
+    logInfo('Log de eventos reiniciado');
     sendNoContent(res, corsHeaders);
     return;
   }
@@ -210,6 +229,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
     }
 
     const consumers = await log.listConsumers({ channel: channelParam });
+    logDebug('Listando consumidores del canal %s (%d)', channelParam, consumers.length);
     sendJson(res, 200, { items: consumers }, corsHeaders);
     return;
   }
@@ -226,6 +246,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
 
     const consumer = await ensureConsumer(log, body.name, body.channel);
     const offset = await consumer.getOffset();
+    logInfo('Consumidor asegurado: %s@%s (offset=%d)', consumer.name, consumer.channel, offset);
     sendJson(res, 201, { name: consumer.name, channel: consumer.channel, offset }, corsHeaders);
     return;
   }
@@ -261,6 +282,14 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
       autoCommit,
     });
     const offset = await consumer.getOffset();
+    logDebug(
+      'Consumidor %s@%s obtuvo %d eventos (autoCommit=%s, offset=%d)',
+      consumer.name,
+      consumer.channel,
+      batch.length,
+      autoCommit,
+      offset,
+    );
     sendJson(
       res,
       200,
@@ -292,6 +321,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
 
     await consumer.commit(value);
     const offset = await consumer.getOffset();
+    logInfo('Offset fijado manualmente para %s@%s en %d', consumer.name, consumer.channel, offset);
     sendJson(res, 200, { name: consumer.name, channel: consumer.channel, offset }, corsHeaders);
     return;
   }
@@ -302,6 +332,7 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
     }
 
     await consumer.reset();
+    logInfo('Offset reiniciado para %s@%s', consumer.name, consumer.channel);
     sendJson(res, 200, { name: consumer.name, channel: consumer.channel, offset: 0 }, corsHeaders);
     return;
   }
@@ -312,7 +343,10 @@ async function handleConsumersRoute(req, res, url, log, corsHeaders) {
 async function handleRequest(req, res, context) {
   const corsHeaders = createCorsHeaders(req);
 
+  logDebug('Solicitud %s %s', req.method, req.url ?? '/');
+
   if (req.method === 'OPTIONS') {
+    logDebug('Respuesta a preflight para %s', req.url ?? '/');
     sendNoContent(res, corsHeaders);
     return;
   }
@@ -326,6 +360,7 @@ async function handleRequest(req, res, context) {
   if (req.method === 'GET' && url.pathname === '/widget') {
     const apiOrigin = url.searchParams.get('apiOrigin') || undefined;
     const channelParam = url.searchParams.get('channel') || undefined;
+    logInfo('Sirviendo widget shell (apiOrigin=%s, channel=%s)', apiOrigin ?? 'local', channelParam ?? '—');
     sendText(
       res,
       200,
@@ -337,6 +372,7 @@ async function handleRequest(req, res, context) {
   }
 
   if (req.method === 'GET' && url.pathname === WIDGET_CLIENT_PATH) {
+    logDebug('Entregando cliente del widget');
     sendText(res, 200, context.widgetClientScript, 'text/plain; charset=utf-8', {
       ...corsHeaders,
       'Cache-Control': 'no-store',
@@ -361,6 +397,7 @@ async function handleRequest(req, res, context) {
     }
 
     const overview = await buildOverview(context.log, channelParam);
+    logInfo('Generando overview para el canal %s', channelParam);
     sendJson(res, 200, overview, corsHeaders);
     return;
   }
@@ -397,7 +434,7 @@ async function startEventBusService(options = {}) {
           return;
         }
 
-        console.error('Error inesperado en la API del event bus', error);
+        logError('Error inesperado en la API del event bus', error);
         const corsHeaders = createCorsHeaders(req);
         sendJson(res, 500, { message: 'Error interno del servidor' }, corsHeaders);
       })
@@ -414,6 +451,8 @@ async function startEventBusService(options = {}) {
   const address = server.address();
   const resolvedHost = address.address === '::' ? 'localhost' : address.address;
   const url = `http://${resolvedHost}:${address.port}`;
+
+  logInfo('Servicio HTTP escuchando en %s', url);
 
   const close = async () => {
     await new Promise((resolve, reject) => {
@@ -444,10 +483,10 @@ module.exports = {
 if (require.main === module) {
   startEventBusService()
     .then(({ url }) => {
-      console.log(`Servicio Event Bus disponible en ${url}`);
+      logInfo('Servicio Event Bus disponible en %s', url);
     })
     .catch((error) => {
-      console.error('No se pudo iniciar el servicio Event Bus', error);
+      logError('No se pudo iniciar el servicio Event Bus', error);
       process.exitCode = 1;
     });
 }

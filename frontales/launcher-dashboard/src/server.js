@@ -12,9 +12,10 @@ async function startDashboardServer(options = {}) {
     runtimeSystems = {},
     systemsConfig = {},
     dashboardDir,
+    logCollector,
   } = options;
 
-  const app = createLauncherApp({ runtimeSystems, systemsConfig, dashboardDir });
+  const app = createLauncherApp({ runtimeSystems, systemsConfig, dashboardDir, logCollector });
 
   const server = http.createServer(app);
   server.listen(port, host);
@@ -23,6 +24,9 @@ async function startDashboardServer(options = {}) {
   const addressInfo = server.address();
   const resolvedHost = addressInfo.address === '::' ? 'localhost' : addressInfo.address;
   const url = `http://${resolvedHost}:${addressInfo.port}/`;
+
+  // eslint-disable-next-line no-console
+  console.info('[launcher-dashboard] Servidor escuchando en %s:%d', resolvedHost, addressInfo.port);
 
   const close = () =>
     new Promise((resolve, reject) => {

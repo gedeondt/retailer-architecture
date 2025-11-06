@@ -83,6 +83,15 @@ npm start
 
 El comando imprimirá en consola la URL local del dashboard. Al abrirla en el navegador se podrá validar la composición visual del panel maestro y desplazarse entre las distintas páginas mediante los enlaces del menú superior.
 
+### Visor de logs del launcher
+
+El launcher intercepta los métodos básicos de `console` (`info`, `debug`, `error`) de cada servicio que orquesta y almacena los mensajes en buffers circulares por nivel y servicio. El dashboard expone esta información mediante dos piezas complementarias:
+
+- **Endpoint REST** `GET /api/logs`: admite filtros `service` y `level` y devuelve `{ items, totalItems, services, levels }`. Está disponible mientras el `launcher` esté en ejecución y responde `503` si el colector no está inicializado.
+- **Microfront de sistemas**: en la rejilla de cuatro columnas se añadió un widget que muestra los logs más recientes, permite filtrar por nivel y refresca automáticamente cada 5 segundos.
+
+Los servicios transversales (NoSQL, Event Bus y dashboard) escriben mensajes informativos al recibir peticiones relevantes, por lo que la vista de logs permite validar rápidamente las operaciones más comunes sin acceder manualmente a la consola.
+
 ## Ejemplo de microfront HelloWorld
 
 Para facilitar que los equipos creen nuevos microfronts con la misma apariencia que el widget de la base NoSQL, se define un servicio de referencia `helloworld`. El objetivo es clonar la estructura del microfront existente y limitarse a cambiar el contenido del cliente.

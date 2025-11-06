@@ -19,12 +19,34 @@ const ECOMMERCE_WIDGET_CLIENT = path.join(
   'src',
   'widget-client.jsx',
 );
+const LOG_PREFIX = '[launcher-dashboard]';
+
+function logInfo(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.info(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logDebug(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.debug(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logWarn(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.warn(`${LOG_PREFIX} ${message}`, ...args);
+}
+
+function logError(message, ...args) {
+  // eslint-disable-next-line no-console
+  console.error(`${LOG_PREFIX} ${message}`, ...args);
+}
 
 function createLauncherApp(options = {}) {
   const {
     runtimeSystems = {},
     systemsConfig = {},
     dashboardDir = getDashboardDir(),
+    logCollector,
   } = options;
 
   const app = express();
@@ -32,6 +54,39 @@ function createLauncherApp(options = {}) {
   app.disable('x-powered-by');
 
   app.use('/dashboard', express.static(dashboardDir));
+
+  app.get('/api/logs', (req, res) => {
+    if (!logCollector) {
+      logWarn('Intento de consultar logs sin collector disponible');
+      res.status(503).json({ message: 'El registro de logs no está disponible' });
+      return;
+    }
+
+    const rawService = typeof req.query?.service === 'string' ? req.query.service : undefined;
+    const rawLevel = typeof req.query?.level === 'string' ? req.query.level : undefined;
+
+    const service = rawService && rawService.trim() !== '' ? rawService.trim() : undefined;
+    const level = rawLevel && rawLevel.trim() !== '' ? rawLevel.trim() : undefined;
+
+    logDebug('GET /api/logs (service=%s, level=%s)', service ?? 'todos', level ?? 'todos');
+
+    if (level && !logCollector.getLevels().includes(level)) {
+      logWarn('Nivel de log inválido solicitado: %s', level);
+      res
+        .status(400)
+        .json({ message: `Nivel de log inválido: ${level}. Valores permitidos: ${logCollector.getLevels().join(', ')}` });
+      return;
+    }
+
+    const items = logCollector.getLogs({ service, level });
+    logInfo('Entregando %d logs (service=%s, level=%s)', items.length, service ?? 'todos', level ?? 'todos');
+    res.json({
+      items,
+      totalItems: items.length,
+      services: logCollector.getServiceNames(),
+      levels: logCollector.getLevels(),
+    });
+  });
 
   app.get('/widgets/ventasdigitales/ecommerce/widget', (req, res, next) => {
     try {
@@ -102,8 +157,7 @@ function createLauncherApp(options = {}) {
   });
 
   app.use((error, _req, res, _next) => {
-    // eslint-disable-next-line no-console
-    console.error('Error en launcher dashboard', error);
+    logError('Error en launcher dashboard', error);
     res.status(500).type('text/plain; charset=utf-8').send('Error interno del servidor');
   });
 

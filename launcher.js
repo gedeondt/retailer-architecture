@@ -3,6 +3,7 @@
 const { startDashboardServer, createDashboardHTML } = require('./frontales/launcher-dashboard/src/server');
 const { startNosqlService } = require('./sistemas/nosql-db/src/server');
 const { startEventBusService } = require('./sistemas/event-bus/src/server');
+const { createServiceLogCollector } = require('./lib/logging/service-log-collector');
 
 async function startLauncher(options = {}) {
   const {
@@ -10,37 +11,65 @@ async function startLauncher(options = {}) {
     host = '127.0.0.1',
     startSystems = true,
     systemsConfig = {},
+    logBufferLimit = 100,
   } = options;
+
+  const logCollector = createServiceLogCollector({ limitPerLevel: logBufferLimit });
+  logCollector.attachConsole(console);
 
   const launchedSystems = [];
   let nosqlService = null;
   let eventBusService = null;
 
-  if (startSystems) {
-    nosqlService = await startNosqlService({ ...(systemsConfig.nosqlDb ?? {}) });
-    launchedSystems.push(nosqlService);
+  try {
+    if (startSystems) {
+      nosqlService = await logCollector.withServiceContext('nosql-db', () =>
+        startNosqlService({ ...(systemsConfig.nosqlDb ?? {}) }),
+      );
+      launchedSystems.push(nosqlService);
 
-    const eventBusOptions = systemsConfig.eventBus ?? {};
-    if (eventBusOptions.startService !== false) {
-      const { startService: _ignored, ...serviceOptions } = eventBusOptions;
-      eventBusService = await startEventBusService(serviceOptions);
-      launchedSystems.push(eventBusService);
+      const eventBusOptions = systemsConfig.eventBus ?? {};
+      if (eventBusOptions.startService !== false) {
+        const { startService: _ignored, ...serviceOptions } = eventBusOptions;
+        eventBusService = await logCollector.withServiceContext('event-bus', () =>
+          startEventBusService(serviceOptions),
+        );
+        launchedSystems.push(eventBusService);
+      }
     }
+
+    const { url, close: closeServer, server } = await logCollector.withServiceContext(
+      'launcher-dashboard',
+      () =>
+        startDashboardServer({
+          port,
+          host,
+          runtimeSystems: { nosql: nosqlService, eventBus: eventBusService },
+          systemsConfig,
+          logCollector,
+        }),
+    );
+
+    const close = async () => {
+      try {
+        await Promise.allSettled(launchedSystems.map((system) => system.close()));
+        await closeServer();
+      } finally {
+        logCollector.restoreConsole();
+      }
+    };
+
+    return {
+      url,
+      close,
+      server,
+      systems: { nosql: nosqlService, eventBus: eventBusService },
+      logs: logCollector,
+    };
+  } catch (error) {
+    logCollector.restoreConsole();
+    throw error;
   }
-
-  const { url, close: closeServer, server } = await startDashboardServer({
-    port,
-    host,
-    runtimeSystems: { nosql: nosqlService, eventBus: eventBusService },
-    systemsConfig,
-  });
-
-  const close = async () => {
-    await Promise.allSettled(launchedSystems.map((system) => system.close()));
-    await closeServer();
-  };
-
-  return { url, close, server, systems: { nosql: nosqlService, eventBus: eventBusService } };
 }
 
 module.exports = {
