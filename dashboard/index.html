@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Launcher Retailer - Inicio</title>
+    <title>Launcher Retailer - Dominios</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous"></script>
@@ -12,140 +12,88 @@
   </head>
   <body
     class="bg-slate-100 min-h-screen text-slate-900"
-    data-dashboard-title="Panel maestro de microfrontends"
-    data-dashboard-section="inicio"
-    data-dashboard-footer="Launcher pensado para orquestar microfronts modulares con distribución en 1, 2 o 4 columnas."
+    data-dashboard-title="Widgets por dominio"
+    data-dashboard-section="dominios"
+    data-dashboard-footer="Planifica la integración de nuevos dominios coordinando contratos y eventos compartidos."
   >
     <div class="min-h-screen flex flex-col">
       <div data-dashboard-include="header"></div>
 
-      <main class="flex-1">
+      <main class="flex-1 bg-white border-y border-slate-200">
         <section class="max-w-7xl mx-auto px-6 py-10">
           <div class="flex items-center justify-between mb-6">
             <div>
-              <h2 class="text-xl font-semibold">Inicio</h2>
+              <h2 class="text-xl font-semibold">Catálogo completo</h2>
               <p class="text-sm text-slate-500">
-                Selección curada de widgets críticos para la operación diaria.
+                Agrupa los microfronts disponibles por dominio funcional.
               </p>
             </div>
-            <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-              Vista 4 columnas
+            <span class="text-xs uppercase tracking-wide text-slate-500">
+              Versionado alfa
             </span>
           </div>
-
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 auto-rows-[minmax(160px,_1fr)]">
-            <article
-              class="col-span-1 sm:col-span-2 xl:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col"
-              data-widget-id="ventas-pedidos"
-              data-widget-size="2"
+            <div
+              id="ventasdigitales-ecommerce-widget-slot"
+              class="col-span-1 sm:col-span-2 xl:col-span-2"
+              role="status"
+              aria-live="polite"
             >
-              <header class="mb-4">
-                <p class="text-xs uppercase tracking-wide text-amber-500">Ventas Digitales</p>
-                <h3 class="text-lg font-semibold">Pedidos hoy</h3>
-              </header>
-              <div class="grid grid-cols-2 gap-4 flex-1">
-                <div>
-                  <p class="text-3xl font-bold">845</p>
-                  <p class="text-xs text-slate-500">Pedidos confirmados</p>
-                </div>
-                <div>
-                  <p class="text-3xl font-bold text-emerald-500">+12%</p>
-                  <p class="text-xs text-slate-500">Vs. promedio semanal</p>
-                </div>
-              </div>
-              <footer class="mt-6 text-xs text-slate-500">
-                Microfront de orquestación muestra KPI de demanda con tendencia.
-              </footer>
-            </article>
+              <article
+                class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex items-center justify-center"
+              >
+                <p class="text-sm text-slate-500">Cargando widget Ecommerce…</p>
+              </article>
+            </div>
 
-            <article
-              class="col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col"
-              data-widget-id="logistica-sla"
-              data-widget-size="1"
+            <div
+              id="atencionalcliente-crm-widget-slot"
+              class="col-span-1 sm:col-span-2 xl:col-span-2"
+              role="status"
+              aria-live="polite"
             >
-              <header class="mb-4">
-                <p class="text-xs uppercase tracking-wide text-blue-500">Logística</p>
-                <h3 class="text-lg font-semibold">Cumplimiento SLA</h3>
-              </header>
-              <div class="flex-1">
-                <ul class="space-y-2 text-sm">
-                  <li class="flex justify-between">
-                    <span>En curso</span>
-                    <span class="font-semibold">92%</span>
-                  </li>
-                  <li class="flex justify-between">
-                    <span>Retrasos</span>
-                    <span class="font-semibold text-red-500">5%</span>
-                  </li>
-                  <li class="flex justify-between">
-                    <span>Incidencias</span>
-                    <span class="font-semibold text-amber-500">18</span>
-                  </li>
-                </ul>
-              </div>
-              <footer class="mt-6 text-xs text-slate-500">
-                Widget compacto de seguimiento de envíos.
-              </footer>
-            </article>
+              <article
+                class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex items-center justify-center"
+              >
+                <p class="text-sm text-slate-500">Cargando widget CRM…</p>
+              </article>
+            </div>
 
-            <article
-              class="col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col"
-              data-widget-id="atencion-sentiment"
-              data-widget-size="1"
-            >
-              <header class="mb-4">
-                <p class="text-xs uppercase tracking-wide text-rose-500">Atención al Cliente</p>
-                <h3 class="text-lg font-semibold">Pulso de satisfacción</h3>
-              </header>
-              <div class="flex-1 flex flex-col gap-3">
-                <div class="flex items-center gap-3">
-                  <span class="text-3xl">🙂</span>
-                  <div>
-                    <p class="text-sm font-semibold">73% positivo</p>
-                    <p class="text-xs text-slate-500">Basado en tickets de hoy</p>
-                  </div>
-                </div>
-                <div class="grid grid-cols-3 gap-2 text-xs">
-                  <div class="bg-emerald-100 text-emerald-700 rounded-lg px-2 py-1 text-center">Feedback</div>
-                  <div class="bg-amber-100 text-amber-700 rounded-lg px-2 py-1 text-center">Tiempo de respuesta</div>
-                  <div class="bg-slate-100 text-slate-700 rounded-lg px-2 py-1 text-center">Top incidencias</div>
-                </div>
-              </div>
-              <footer class="mt-6 text-xs text-slate-500">
-                Microfront de escucha social integrado al panel.
-              </footer>
+            <article class="col-span-1 bg-slate-50 rounded-xl border border-slate-200 p-6">
+              <h3 class="text-base font-semibold mb-2">Ventas Digitales</h3>
+              <p class="text-sm text-slate-600">
+                Widgets de funnels, rendimiento de campañas y métricas de conversión.
+              </p>
+              <button class="mt-4 text-sm font-semibold text-amber-600 hover:text-amber-700">
+                Ver catálogo
+              </button>
             </article>
-
-            <article
-              class="col-span-1 sm:col-span-2 xl:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-6"
-              data-widget-id="contabilidad-caja"
-              data-widget-size="4"
-            >
-              <header class="flex items-center justify-between mb-4">
-                <div>
-                  <p class="text-xs uppercase tracking-wide text-violet-500">Contabilidad</p>
-                  <h3 class="text-lg font-semibold">Salud de caja</h3>
-                </div>
-                <span class="text-xs text-slate-500">Widget panorámico (4 columnas)</span>
-              </header>
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="md:col-span-2">
-                  <p class="text-sm text-slate-500">Facturación neta (hoy)</p>
-                  <p class="text-2xl font-bold">$ 245.800</p>
-                  <p class="text-xs text-emerald-600 mt-1">+8% vs. ayer</p>
-                </div>
-                <div>
-                  <p class="text-sm text-slate-500">Reembolsos pendientes</p>
-                  <p class="text-lg font-semibold text-amber-600">$ 12.400</p>
-                </div>
-                <div>
-                  <p class="text-sm text-slate-500">Alertas fiscales</p>
-                  <p class="text-lg font-semibold text-red-500">2</p>
-                </div>
-              </div>
-              <div class="mt-6 text-xs text-slate-500">
-                Representa un microfront de control financiero con indicadores agrupados.
-              </div>
+            <article class="col-span-1 bg-slate-50 rounded-xl border border-slate-200 p-6">
+              <h3 class="text-base font-semibold mb-2">Logística</h3>
+              <p class="text-sm text-slate-600">
+                Paneles de fulfillment, rutas inteligentes y control de inventario.
+              </p>
+              <button class="mt-4 text-sm font-semibold text-blue-600 hover:text-blue-700">
+                Ver catálogo
+              </button>
+            </article>
+            <article class="col-span-1 bg-slate-50 rounded-xl border border-slate-200 p-6">
+              <h3 class="text-base font-semibold mb-2">Atención al Cliente</h3>
+              <p class="text-sm text-slate-600">
+                Gestión de casos, sentiment analysis y monitoreo de canales.
+              </p>
+              <button class="mt-4 text-sm font-semibold text-rose-600 hover:text-rose-700">
+                Ver catálogo
+              </button>
+            </article>
+            <article class="col-span-1 bg-slate-50 rounded-xl border border-slate-200 p-6">
+              <h3 class="text-base font-semibold mb-2">Contabilidad</h3>
+              <p class="text-sm text-slate-600">
+                Estados financieros, conciliaciones y alertas de cumplimiento.
+              </p>
+              <button class="mt-4 text-sm font-semibold text-violet-600 hover:text-violet-700">
+                Ver catálogo
+              </button>
             </article>
           </div>
         </section>
@@ -153,5 +101,7 @@
 
       <div data-dashboard-include="footer"></div>
     </div>
+
+    <script type="module" src="/dashboard/scripts/dominios-page.js"></script>
   </body>
 </html>

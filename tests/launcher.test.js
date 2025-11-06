@@ -16,7 +16,8 @@ test('startLauncher sirve el dashboard y sus páginas principales', async (t) =>
   assert.equal(homeResponse.status, 200);
   const homeBody = await homeResponse.text();
   assert.match(homeBody, /Launcher Retailer/);
-  assert.match(homeBody, /Vista 4 columnas/);
+  assert.match(homeBody, /Widgets por dominio/);
+  assert.match(homeBody, /ventasdigitales-ecommerce-widget-slot/);
 
   const dominiosResponse = await fetch(new URL('/dominios.html', url));
   assert.equal(dominiosResponse.status, 200);

@@ -34,13 +34,15 @@ test('dominios-page monta el widget de ecommerce con el origen por defecto', asy
   const scriptUrl = pathToFileURL(path.join(__dirname, '..', 'dominios-page.js'));
   await import(`${scriptUrl.href}?test=${Date.now()}`);
 
-  assert.equal(recorded.length, 1);
-  assert.equal(recorded[0].slotId, 'ventasdigitales-ecommerce-widget-slot');
+  const ecommerceMounts = recorded.filter(
+    (entry) => entry.slotId === 'ventasdigitales-ecommerce-widget-slot',
+  );
+  assert.equal(ecommerceMounts.length, 1);
   assert.equal(
-    recorded[0].defaultWidgetOrigin,
+    ecommerceMounts[0].defaultWidgetOrigin,
     'http://localhost:3050/widgets/ventasdigitales/ecommerce/',
   );
-  assert.equal(recorded[0].defaultApiOrigin, 'http://127.0.0.1:4300');
+  assert.equal(ecommerceMounts[0].defaultApiOrigin, 'http://127.0.0.1:4300');
 });
 
 test('dominios-page utiliza la configuración del launcher cuando está disponible', async (t) => {
@@ -78,6 +80,9 @@ test('dominios-page utiliza la configuración del launcher cuando está disponib
   const scriptUrl = pathToFileURL(path.join(__dirname, '..', 'dominios-page.js'));
   await import(`${scriptUrl.href}?test=${Date.now()}`);
 
-  assert.equal(recorded.length, 1);
-  assert.equal(recorded[0].defaultApiOrigin, 'http://127.0.0.1:5555');
+  const ecommerceMounts = recorded.filter(
+    (entry) => entry.slotId === 'ventasdigitales-ecommerce-widget-slot',
+  );
+  assert.equal(ecommerceMounts.length, 1);
+  assert.equal(ecommerceMounts[0].defaultApiOrigin, 'http://127.0.0.1:5555');
 });

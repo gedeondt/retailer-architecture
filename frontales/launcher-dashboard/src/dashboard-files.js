@@ -9,8 +9,8 @@ const DASHBOARD_DIR = path.join(ROOT_DIR, 'dashboard');
 const PAGE_MAP = new Map([
   ['/', 'index.html'],
   ['/index.html', 'index.html'],
-  ['/dominios', 'dominios.html'],
-  ['/dominios.html', 'dominios.html'],
+  ['/dominios', 'index.html'],
+  ['/dominios.html', 'index.html'],
   ['/sistemas', 'sistemas.html'],
   ['/sistemas.html', 'sistemas.html'],
 ]);

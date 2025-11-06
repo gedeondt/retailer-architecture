@@ -10,9 +10,15 @@ const { startDashboardServer, createDashboardHTML } = require('../src/server');
 
 test('createDashboardHTML lee la página principal desde el sistema de archivos', () => {
   const html = createDashboardHTML();
-  assert.ok(html.includes('Panel maestro de microfrontends'), 'la cabecera del dashboard está presente');
-  assert.ok(html.includes('data-widget-id="ventas-pedidos"'), 'incluye widget de pedidos');
-  assert.ok(html.includes('data-widget-size="4"'), 'muestra widgets panorámicos de 4 columnas');
+  assert.ok(html.includes('Widgets por dominio'), 'la cabecera del dashboard está presente');
+  assert.ok(
+    html.includes('ventasdigitales-ecommerce-widget-slot'),
+    'incluye el contenedor para el widget de ecommerce',
+  );
+  assert.ok(
+    html.includes('atencionalcliente-crm-widget-slot'),
+    'incluye el contenedor para el widget de CRM',
+  );
   assert.ok(
     html.includes('data-dashboard-include="header"'),
     'incluye el marcador para insertar el header compartido',
@@ -31,13 +37,13 @@ test('startDashboardServer sirve páginas independientes para cada sección', as
   assert.equal(homeResponse.status, 200);
   const homeBody = await homeResponse.text();
   assert.match(homeBody, /Launcher Retailer/);
-  assert.match(homeBody, /grid-cols-1 sm:grid-cols-2 xl:grid-cols-4/);
+  assert.match(homeBody, /Widgets por dominio/);
+  assert.match(homeBody, /ventasdigitales-ecommerce-widget-slot/);
 
   const dominiosResponse = await fetch(new URL('/dominios.html', url));
   assert.equal(dominiosResponse.status, 200);
   const dominiosBody = await dominiosResponse.text();
   assert.match(dominiosBody, /Widgets por dominio/);
-  assert.match(dominiosBody, /Ver catálogo/);
   assert.match(dominiosBody, /ventasdigitales-ecommerce-widget-slot/);
   assert.match(dominiosBody, /atencionalcliente-crm-widget-slot/);
   assert.match(dominiosBody, /Cargando widget CRM…/);

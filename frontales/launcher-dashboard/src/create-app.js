@@ -130,18 +130,9 @@ function createLauncherApp(options = {}) {
     }
   });
 
-  app.get(['/', '/index.html'], (_req, res, next) => {
+  app.get(['/', '/index.html', '/dominios', '/dominios.html'], (_req, res, next) => {
     try {
       const html = readDashboardPage('index.html');
-      res.type('html').send(html);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get(['/dominios', '/dominios.html'], (_req, res, next) => {
-    try {
-      const html = readDashboardPage('dominios.html');
       res.type('html').send(html);
     } catch (error) {
       next(error);
