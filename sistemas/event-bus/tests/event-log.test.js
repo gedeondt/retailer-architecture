@@ -212,3 +212,35 @@ test('EventConsumer#getOffset expone el offset persistido', async (t) => {
   const offset = await consumer.getOffset();
   assert.equal(offset, 1);
 });
+
+test('listChannelSummaries devuelve métricas agregadas por canal', async (t) => {
+  const now = new Date('2024-01-01T00:00:40.000Z');
+  const timestamps = [
+    new Date('2024-01-01T00:00:02.000Z'),
+    new Date('2024-01-01T00:00:09.500Z'),
+    new Date('2024-01-01T00:00:40.000Z'),
+  ];
+
+  const log = await createTempLog(t, {
+    channels: ['general', 'ventas'],
+    clock: () => (timestamps.length > 0 ? timestamps.shift() : now),
+  });
+
+  await log.append({ channel: 'general', type: 'general.event' });
+  await log.append({ channel: 'ventas', type: 'ventas.event.antiguo' });
+  await log.append({ channel: 'ventas', type: 'ventas.event.reciente' });
+
+  const summaries = await log.listChannelSummaries({ windowMs: 10_000 });
+  assert.equal(summaries.length, 2);
+
+  const generalSummary = summaries.find((item) => item.name === 'general');
+  assert.ok(generalSummary, 'incluye el canal general');
+  assert.equal(generalSummary.totalEvents, 1);
+  assert.equal(generalSummary.throughput, 0);
+
+  const ventasSummary = summaries.find((item) => item.name === 'ventas');
+  assert.ok(ventasSummary, 'incluye el canal ventas');
+  assert.equal(ventasSummary.totalEvents, 2);
+  assert.equal(ventasSummary.lastEventType, 'ventas.event.reciente');
+  assert.equal(ventasSummary.throughput, 1);
+});

@@ -71,6 +71,7 @@ test('startLauncher inicia los sistemas compartidos y expone su configuración',
   assert.equal(eventBusResponse.status, 200);
   const eventBusPayload = await eventBusResponse.json();
   assert.equal(eventBusPayload.totalEvents, 0);
+  assert.ok(Array.isArray(eventBusPayload.channels));
 
   const nosqlLogsResponse = await fetch(new URL('/api/logs?service=nosql-db', url));
   assert.equal(nosqlLogsResponse.status, 200);
