@@ -3,6 +3,7 @@
 const { startDashboardServer, createDashboardHTML } = require('./frontales/launcher-dashboard/src/server');
 const { startNosqlService } = require('./sistemas/nosql-db/src/server');
 const { startEventBusService } = require('./sistemas/event-bus/src/server');
+const { startCheckoutService } = require('./dominios/ventasdigitales/servicios/ecommerce-api/src');
 const { createServiceLogCollector } = require('./lib/logging/service-log-collector');
 
 async function startLauncher(options = {}) {
@@ -10,7 +11,9 @@ async function startLauncher(options = {}) {
     port = 3000,
     host = '127.0.0.1',
     startSystems = true,
+    startDomainServices = startSystems,
     systemsConfig = {},
+    domainServicesConfig = {},
     logBufferLimit = 100,
   } = options;
 
@@ -18,8 +21,10 @@ async function startLauncher(options = {}) {
   logCollector.attachConsole(console);
 
   const launchedSystems = [];
+  const launchedDomainServices = [];
   let nosqlService = null;
   let eventBusService = null;
+  let ecommerceApiService = null;
 
   try {
     if (startSystems) {
@@ -38,6 +43,42 @@ async function startLauncher(options = {}) {
       }
     }
 
+    if (startDomainServices) {
+      const ventasDigitalesConfig = domainServicesConfig.ventasDigitales ?? {};
+      const ecommerceConfig = ventasDigitalesConfig.ecommerceApi ?? {};
+      if (ecommerceConfig.startService !== false) {
+        const { startService: _ignored, ...serviceOptions } = ecommerceConfig;
+
+        const nosqlUrl =
+          serviceOptions.nosqlUrl ??
+          nosqlService?.url ??
+          systemsConfig?.nosqlDb?.apiOrigin ??
+          systemsConfig?.nosqlDb?.widgetOrigin;
+        const eventBusUrl =
+          serviceOptions.eventBusUrl ??
+          eventBusService?.url ??
+          systemsConfig?.eventBus?.apiOrigin ??
+          systemsConfig?.eventBus?.widgetOrigin;
+
+        if (!nosqlUrl) {
+          throw new Error(
+            'No se pudo determinar la URL del servicio NoSQL para iniciar ventasdigitales-ecommerce-api.',
+          );
+        }
+
+        if (!eventBusUrl) {
+          throw new Error(
+            'No se pudo determinar la URL del Event Bus para iniciar ventasdigitales-ecommerce-api.',
+          );
+        }
+
+        ecommerceApiService = await logCollector.withServiceContext('ventasdigitales-ecommerce-api', () =>
+          startCheckoutService({ ...serviceOptions, nosqlUrl, eventBusUrl }),
+        );
+        launchedDomainServices.push(ecommerceApiService);
+      }
+    }
+
     const { url, close: closeServer, server } = await logCollector.withServiceContext(
       'launcher-dashboard',
       () =>
@@ -45,14 +86,21 @@ async function startLauncher(options = {}) {
           port,
           host,
           runtimeSystems: { nosql: nosqlService, eventBus: eventBusService },
+          runtimeDomains: ecommerceApiService
+            ? { ventasDigitales: { ecommerceApi: ecommerceApiService } }
+            : {},
           systemsConfig,
+          domainServicesConfig,
           logCollector,
         }),
     );
 
     const close = async () => {
       try {
-        await Promise.allSettled(launchedSystems.map((system) => system.close()));
+        await Promise.allSettled([
+          ...launchedSystems.map((system) => system.close()),
+          ...launchedDomainServices.map((service) => service.close()),
+        ]);
         await closeServer();
       } finally {
         logCollector.restoreConsole();
@@ -64,6 +112,7 @@ async function startLauncher(options = {}) {
       close,
       server,
       systems: { nosql: nosqlService, eventBus: eventBusService },
+      domains: ecommerceApiService ? { ventasDigitales: { ecommerceApi: ecommerceApiService } } : {},
       logs: logCollector,
     };
   } catch (error) {

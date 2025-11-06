@@ -65,6 +65,11 @@ test('startDashboardServer inyecta la configuración de los widgets cuando se pr
       nosqlDb: { apiOrigin: 'http://127.0.0.1:6001', dataDir: nosqlDir },
       eventBus: { apiOrigin: 'http://127.0.0.1:6002', dataDir: eventBusDir, channel: 'ventas' },
     },
+    domainServicesConfig: {
+      ventasDigitales: {
+        ecommerceApi: { apiOrigin: 'http://127.0.0.1:7001' },
+      },
+    },
   });
 
   t.after(async () => {
@@ -95,6 +100,10 @@ test('startDashboardServer inyecta la configuración de los widgets cuando se pr
     'se combina el runtime con la API del Event Bus',
   );
   assert.ok(body.includes('"channel":"ventas"'), 'expone el canal configurado del Event Bus');
+  assert.ok(
+    body.includes('"domains":{"ventasDigitales":{"ecommerceApi":{"apiOrigin":"http://127.0.0.1:7001"}}}'),
+    'incluye la configuración del dominio de ventas digitales',
+  );
 });
 
 test('startDashboardServer utiliza el puerto 3000 por defecto', async (t) => {
@@ -131,6 +140,31 @@ test('startDashboardServer expone el widget de ecommerce del dominio de ventas d
   const clientBody = await clientResponse.text();
   assert.match(clientBody, /SKU-ACOUSTIC-01/);
   assert.match(clientBody, /OrderConfirmed/);
+});
+
+test('el widget de ecommerce utiliza el apiOrigin del runtime o la configuración', async (t) => {
+  const runtimeDomains = {
+    ventasDigitales: {
+      ecommerceApi: { url: 'http://127.0.0.1:5300' },
+    },
+  };
+
+  const { url, close } = await startDashboardServer({
+    port: 0,
+    runtimeDomains,
+    domainServicesConfig: {
+      ventasDigitales: {
+        ecommerceApi: { apiOrigin: 'http://127.0.0.1:5400' },
+      },
+    },
+  });
+
+  t.after(close);
+
+  const response = await fetch(new URL('/widgets/ventasdigitales/ecommerce/widget', url));
+  assert.equal(response.status, 200);
+  const body = await response.text();
+  assert.match(body, /data-api-origin="http:\/\/127\.0\.0\.1:5400"/);
 });
 
 test('GET /api/logs responde sin emitir nuevos logs', async (t) => {

@@ -10,12 +10,21 @@ async function startDashboardServer(options = {}) {
     port = 3000,
     host = '127.0.0.1',
     runtimeSystems = {},
+    runtimeDomains = {},
     systemsConfig = {},
+    domainServicesConfig = {},
     dashboardDir,
     logCollector,
   } = options;
 
-  const app = createLauncherApp({ runtimeSystems, systemsConfig, dashboardDir, logCollector });
+  const app = createLauncherApp({
+    runtimeSystems,
+    runtimeDomains,
+    systemsConfig,
+    domainServicesConfig,
+    dashboardDir,
+    logCollector,
+  });
 
   const server = http.createServer(app);
   server.listen(port, host);
