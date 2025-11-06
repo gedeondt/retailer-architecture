@@ -67,10 +67,27 @@ test('CheckoutProcessor persiste el pedido y publica OrderConfirmed', async (t) 
   assert.equal(typeof result.eventRecord, 'object');
   assert.equal(result.eventRecord.type, 'OrderConfirmed');
   assert.equal(result.eventRecord.channel, DEFAULT_EVENT_CHANNEL);
-  assert.equal(result.eventRecord.payload.orderId, result.orderId);
-  assert.equal(result.eventRecord.payload.customerId, result.customerId);
-  assert.equal(result.eventRecord.payload.paymentId, result.paymentId);
-  assert.equal(result.eventRecord.payload.totalAmount, payload.totalAmount);
+  const eventPayload = result.eventRecord.payload;
+  assert.equal(eventPayload.order.id, result.orderId);
+  assert.equal(eventPayload.order.customerId, result.customerId);
+  assert.equal(eventPayload.order.channelOrigin, payload.channelOrigin);
+  assert.ok(eventPayload.order.paymentIds.includes(result.paymentId));
+  assert.equal(eventPayload.order.total.amount, payload.totalAmount);
+  assert.equal(eventPayload.order.total.currency, payload.currency);
+  assert.equal(eventPayload.customer.id, result.customerId);
+  assert.equal(eventPayload.customer.email, payload.customer.email);
+  assert.equal(eventPayload.payment.id, result.paymentId);
+  assert.equal(eventPayload.payment.method, payload.payment.method);
+  assert.equal(eventPayload.payment.amount, payload.totalAmount);
+  assert.equal(eventPayload.payment.card.brand, payload.payment.card.brand);
+  assert.equal(eventPayload.payment.card.last4, payload.payment.card.last4);
+  assert.equal(eventPayload.payment.securityCodeProvided, payload.payment.securityCodeProvided);
+  assert.equal(eventPayload.items.length, payload.items.length);
+  assert.deepEqual(
+    eventPayload.items.map((item) => ({ sku: item.sku, quantity: item.quantity })),
+    payload.items.map((item) => ({ sku: item.sku, quantity: item.quantity })),
+  );
+  assert.equal(eventPayload.items[0].unitPrice, payload.items[0].price);
 
   const ordersResponse = await fetch(
     new URL(`/collections/digital-orders/items?page=1&pageSize=10`, nosql.url),
@@ -105,7 +122,11 @@ test('CheckoutProcessor persiste el pedido y publica OrderConfirmed', async (t) 
   const events = await eventsResponse.json();
   assert.equal(events.items.length, 1);
   assert.equal(events.items[0].type, 'OrderConfirmed');
-  assert.equal(events.items[0].payload.orderId, result.orderId);
+  const storedPayload = events.items[0].payload;
+  assert.equal(storedPayload.order.id, result.orderId);
+  assert.equal(storedPayload.customer.id, result.customerId);
+  assert.equal(storedPayload.payment.id, result.paymentId);
+  assert.equal(storedPayload.items.length, payload.items.length);
 });
 
 test('CheckoutProcessor rechaza pedidos sin ítems', async () => {

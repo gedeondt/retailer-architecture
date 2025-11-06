@@ -65,14 +65,18 @@ test('startCheckoutService expone POST /orders que persiste y publica el evento'
   const body = await response.json();
   assert.ok(body.orderId);
   assert.equal(body.event.type, 'OrderConfirmed');
-  assert.equal(body.event.payload.orderId, body.orderId);
+  assert.equal(body.event.payload.order.id, body.orderId);
+  assert.equal(body.event.payload.customer.id, body.event.payload.order.customerId);
+  assert.equal(body.event.payload.payment.id, body.event.payload.order.paymentIds[0]);
+  assert.equal(body.event.payload.items[0].unitPrice, payload.items[0].price);
 
   const eventsResponse = await fetch(
     new URL(`/events?channel=${encodeURIComponent(DEFAULT_EVENT_CHANNEL)}`, eventBus.url),
   );
   const events = await eventsResponse.json();
   assert.equal(events.items.length, 1);
-  assert.equal(events.items[0].payload.orderId, body.orderId);
+  assert.equal(events.items[0].payload.order.id, body.orderId);
+  assert.equal(events.items[0].payload.payment.id, body.event.payload.payment.id);
 });
 
 test('POST /orders rechaza cuerpos no JSON y responde CORS en preflight', async (t) => {

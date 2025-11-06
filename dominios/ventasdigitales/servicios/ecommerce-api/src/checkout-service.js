@@ -174,18 +174,65 @@ class CheckoutProcessor {
 
     await this.persistOrder(orderEntity, lineItems, paymentEntity);
 
-    const eventPayload = {
-      orderId,
+    const customerSummary = orderEntity.resumenCliente ?? {};
+
+    const customerForEvent = {
+      id: customerId,
+      firstName: customerSummary.firstName ?? null,
+      lastName: customerSummary.lastName ?? null,
+      email: customerSummary.email ?? null,
+      phone: customerSummary.phone ?? null,
+    };
+
+    const orderForEvent = {
+      id: orderId,
       customerId,
-      paymentId,
-      items: normalized.items.map((item) => ({
-        sku: item.sku,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      totalAmount: normalized.totalAmount,
-      currency: normalized.currency,
-      confirmedAt: confirmedAtIso,
+      channelOrigin: orderEntity.canalOrigen,
+      status: orderEntity.estado,
+      total: {
+        amount: orderEntity.total.monto,
+        currency: orderEntity.total.moneda,
+      },
+      paymentIds: Array.isArray(orderEntity.metodosPago) ? [...orderEntity.metodosPago] : [],
+      confirmedAt: orderEntity.confirmadoEn,
+      items: Array.isArray(orderEntity.items)
+        ? orderEntity.items.map((item) => ({
+            sku: item.sku,
+            quantity: item.cantidad,
+          }))
+        : [],
+    };
+
+    const itemsForEvent = lineItems.map((line) => ({
+      id: line.lineaId,
+      orderId: line.pedidoId,
+      sku: line.sku,
+      quantity: line.cantidad,
+      unitPrice: line.precioUnitario,
+      lineTotal: line.totalLinea,
+      promotions: Array.isArray(line.promocionesAplicadas) ? line.promocionesAplicadas : [],
+      position: line.posicion,
+    }));
+
+    const paymentDetails = paymentEntity.detalles ?? {};
+    const paymentCard = paymentDetails.tarjeta ?? {};
+
+    const paymentForEvent = {
+      id: paymentEntity.pagoId,
+      orderId: paymentEntity.pedidoId,
+      method: paymentEntity.metodo,
+      amount: paymentEntity.monto,
+      currency: paymentEntity.moneda,
+      status: paymentEntity.estado,
+      securityCodeProvided: Boolean(paymentDetails.codigoSeguridadInformado),
+      card: { ...paymentCard },
+    };
+
+    const eventPayload = {
+      order: orderForEvent,
+      customer: customerForEvent,
+      items: itemsForEvent,
+      payment: paymentForEvent,
     };
 
     const eventRecord = await this.publishEvent(eventPayload);
