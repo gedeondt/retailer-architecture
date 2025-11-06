@@ -39,4 +39,5 @@ test('dominios-page monta el widget de ecommerce con el origen por defecto', asy
     recorded[0].defaultWidgetOrigin,
     'http://localhost:3050/widgets/ventasdigitales/ecommerce/',
   );
+  assert.equal(recorded[0].defaultApiOrigin, 'http://127.0.0.1:4300');
 });
