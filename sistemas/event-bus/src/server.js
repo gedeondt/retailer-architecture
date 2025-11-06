@@ -12,6 +12,7 @@ const { renderWidgetShell, WIDGET_CLIENT_PATH } = require('./widget-shell');
 const DEFAULT_PORT = 4200;
 const DEFAULT_HOST = '127.0.0.1';
 const MAX_BODY_SIZE_BYTES = 512 * 1024;
+const OVERVIEW_THROUGHPUT_WINDOW_MS = 10_000;
 const LOG_PREFIX = '[event-bus]';
 
 function logInfo(message, ...args) {
@@ -135,13 +136,42 @@ function decodeConsumerSegment(segment) {
   }
 }
 
-async function buildOverview(log, channel) {
-  if (typeof channel !== 'string' || channel.trim().length === 0) {
-    throw new HttpError(400, 'El parámetro channel es obligatorio');
+async function buildOverview(log, channelParam) {
+  const normalizedChannel =
+    typeof channelParam === 'string' && channelParam.trim().length > 0
+      ? channelParam.trim()
+      : null;
+
+  let targetChannel = normalizedChannel;
+  let events = [];
+
+  if (targetChannel) {
+    events = await log.listEvents({ channel: targetChannel });
   }
 
-  const targetChannel = channel.trim();
-  const events = await log.listEvents({ channel: targetChannel });
+  let channelSummaries = await log.listChannelSummaries({
+    windowMs: OVERVIEW_THROUGHPUT_WINDOW_MS,
+  });
+
+  if (!targetChannel) {
+    targetChannel = channelSummaries[0]?.name ?? 'general';
+    events = await log.listEvents({ channel: targetChannel });
+    channelSummaries = await log.listChannelSummaries({
+      windowMs: OVERVIEW_THROUGHPUT_WINDOW_MS,
+    });
+  } else if (!channelSummaries.some((summary) => summary.name === targetChannel)) {
+    events = await log.listEvents({ channel: targetChannel });
+    channelSummaries = await log.listChannelSummaries({
+      windowMs: OVERVIEW_THROUGHPUT_WINDOW_MS,
+    });
+  }
+
+  const nonEmptyChannel = channelSummaries.find((summary) => summary.totalEvents > 0);
+  if (nonEmptyChannel && events.length === 0 && nonEmptyChannel.name !== targetChannel) {
+    targetChannel = nonEmptyChannel.name;
+    events = await log.listEvents({ channel: targetChannel });
+  }
+
   const consumers = await log.listConsumers({ channel: targetChannel });
   const lastEvent = events.length > 0 ? events[events.length - 1] : null;
   const highWatermark = lastEvent ? lastEvent.id : 0;
@@ -152,6 +182,12 @@ async function buildOverview(log, channel) {
     pendingEvents: Math.max(0, highWatermark - consumer.offset),
   }));
 
+  const targetSummary = channelSummaries.find((summary) => summary.name === targetChannel);
+  const totalStoredEvents = channelSummaries.reduce(
+    (sum, summary) => sum + summary.totalEvents,
+    0,
+  );
+
   return {
     channel: targetChannel,
     totalEvents: events.length,
@@ -159,6 +195,10 @@ async function buildOverview(log, channel) {
     lastEvent,
     recentEvents,
     consumers: consumerSummaries,
+    totalChannels: channelSummaries.length,
+    totalStoredEvents,
+    channelThroughput: targetSummary ? targetSummary.throughput : 0,
+    channels: channelSummaries,
   };
 }
 
@@ -391,13 +431,10 @@ async function handleRequest(req, res, context) {
   }
 
   if (req.method === 'GET' && url.pathname === '/overview') {
-    const channelParam = url.searchParams.get('channel');
-    if (!channelParam) {
-      throw new HttpError(400, 'El parámetro channel es obligatorio');
-    }
-
+    const channelParam = url.searchParams.get('channel') || undefined;
     const overview = await buildOverview(context.log, channelParam);
-    logInfo('Generando overview para el canal %s', channelParam);
+    const resolvedChannel = overview.channel ?? channelParam ?? '—';
+    logInfo('Generando overview para el canal %s', resolvedChannel);
     sendJson(res, 200, overview, corsHeaders);
     return;
   }

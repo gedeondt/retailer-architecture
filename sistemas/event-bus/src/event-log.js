@@ -299,6 +299,46 @@ class SimpleEventLog {
     return consumers;
   }
 
+  async listChannelSummaries(options = {}) {
+    await this._initPromise;
+
+    const windowMs =
+      Number.isInteger(options.windowMs) && options.windowMs > 0 ? options.windowMs : 10_000;
+    const now = this.clock();
+    if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
+      throw new TypeError('El reloj del EventLog debe devolver instancias de Date válidas');
+    }
+
+    const cutoff = now.getTime() - windowMs;
+    const meta = await this._readMeta();
+    const summaries = [];
+
+    for (const [sanitized, channelMeta] of Object.entries(meta.channels ?? {})) {
+      const events = await this._readAllEvents(sanitized);
+      const lastEvent = events.length > 0 ? events[events.length - 1] : null;
+
+      let throughput = 0;
+      for (const event of events) {
+        const timestampValue = Date.parse(event.timestamp);
+        if (!Number.isNaN(timestampValue) && timestampValue >= cutoff) {
+          throughput += 1;
+        }
+      }
+
+      summaries.push({
+        name: channelMeta.name,
+        totalEvents: events.length,
+        lastEventId: lastEvent ? lastEvent.id : 0,
+        lastEventType: lastEvent ? lastEvent.type : null,
+        lastEventTimestamp: lastEvent ? lastEvent.timestamp : null,
+        throughput,
+      });
+    }
+
+    summaries.sort((a, b) => a.name.localeCompare(b.name));
+    return summaries;
+  }
+
   async reset() {
     await this._initPromise;
 

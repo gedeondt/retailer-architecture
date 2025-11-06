@@ -133,6 +133,14 @@ test('overview agrega métricas y refleja consumidores y eventos', async (t) => 
   assert.equal(overview.recentEvents.length, 1);
   assert.equal(overview.consumers.length, 1);
   assert.equal(overview.consumers[0].name, 'facturacion');
+  assert.equal(overview.channel, 'general');
+  assert.ok(Array.isArray(overview.channels));
+  const summary = overview.channels.find((item) => item.name === 'general');
+  assert.ok(summary, 'incluye resumen del canal general');
+  assert.equal(summary.totalEvents, 1);
+  assert.ok(overview.totalChannels >= 1);
+  assert.ok(overview.totalStoredEvents >= 1);
+  assert.ok(overview.channelThroughput >= 1);
 });
 
 test('sirve el widget HTML y el cliente React', async (t) => {
