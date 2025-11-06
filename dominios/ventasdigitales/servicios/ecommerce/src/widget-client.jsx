@@ -34,6 +34,7 @@
   ];
 
   const DEFAULT_CURRENCY = 'EUR';
+  const DEFAULT_API_ORIGIN = 'http://127.0.0.1:4300';
 
   const CARD_BRAND_PATTERNS = [
     { pattern: /^4/, brand: 'visa' },
@@ -51,6 +52,39 @@
       }).format(value);
     } catch (_error) {
       return `${value.toFixed(2)} ${currency}`;
+    }
+  }
+
+  function normalizeApiOrigin(value) {
+    if (typeof value !== 'string') {
+      return DEFAULT_API_ORIGIN;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : DEFAULT_API_ORIGIN;
+  }
+
+  function getApiOrigin(container) {
+    if (!container || typeof container !== 'object') {
+      return DEFAULT_API_ORIGIN;
+    }
+    const dataset = container.dataset || {};
+    return normalizeApiOrigin(dataset.apiOrigin);
+  }
+
+  function ensureTrailingSlash(value) {
+    if (typeof value !== 'string' || value.length === 0) {
+      return '/';
+    }
+    return value.endsWith('/') ? value : `${value}/`;
+  }
+
+  function buildOrdersEndpoint(origin) {
+    const baseWithSlash = ensureTrailingSlash(origin || DEFAULT_API_ORIGIN);
+    try {
+      const url = new URL('orders', baseWithSlash);
+      return url.toString();
+    } catch (_error) {
+      return null;
     }
   }
 
@@ -521,6 +555,88 @@
     const event = useMemo(() => buildOrderEvent({ formData, items }), [formData, items]);
 
     const currency = formData.currency || DEFAULT_CURRENCY;
+    const apiOrigin = useMemo(() => getApiOrigin(container), [container]);
+    const ordersEndpoint = useMemo(() => buildOrdersEndpoint(apiOrigin), [apiOrigin]);
+
+    const [submissionState, setSubmissionState] = useState({
+      status: 'idle',
+      message: null,
+      details: null,
+    });
+
+    const isSending = submissionState.status === 'sending';
+    const isSubmitDisabled = isSending || items.length === 0;
+
+    const handleSend = async () => {
+      if (!items.length) {
+        setSubmissionState({
+          status: 'error',
+          message: 'Agrega al menos un producto antes de confirmar el pedido.',
+          details: null,
+        });
+        return;
+      }
+
+      if (!ordersEndpoint) {
+        setSubmissionState({
+          status: 'error',
+          message: 'La URL del servicio de ecommerce no es válida.',
+          details: null,
+        });
+        return;
+      }
+
+      setSubmissionState({ status: 'sending', message: null, details: null });
+
+      try {
+        const response = await fetch(ordersEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event.payload),
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'El servicio de ecommerce rechazó la petición.';
+          try {
+            const errorBody = await response.json();
+            if (errorBody && typeof errorBody.message === 'string') {
+              errorMessage = errorBody.message;
+            }
+          } catch (_error) {
+            // Ignorar errores al interpretar la respuesta
+          }
+
+          setSubmissionState({
+            status: 'error',
+            message: errorMessage,
+            details: { status: response.status },
+          });
+          return;
+        }
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (_error) {
+          data = {};
+        }
+
+        setSubmissionState({
+          status: 'success',
+          message: 'Pedido enviado correctamente.',
+          details: {
+            orderId: data && typeof data.orderId === 'string' ? data.orderId : null,
+            confirmedAt: data && typeof data.confirmedAt === 'string' ? data.confirmedAt : null,
+          },
+        });
+      } catch (_error) {
+        setSubmissionState({
+          status: 'error',
+          message: 'No se pudo conectar con el servicio de ecommerce.',
+          details: null,
+        });
+      }
+    };
 
     return (
       <div className="h-full flex flex-col">
@@ -571,6 +687,46 @@
             </span>
           </header>
           <EventPreview event={event} />
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={isSubmitDisabled}
+                className="inline-flex items-center justify-center rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/70 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSending ? 'Enviando…' : 'Enviar pedido'}
+              </button>
+              <span className="text-[11px] text-slate-500">
+                Servicio: <code className="font-mono text-slate-600">{apiOrigin}</code>
+              </span>
+            </div>
+            {submissionState.status === 'success' ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">
+                <p className="font-medium">{submissionState.message}</p>
+                <ul className="mt-1 space-y-0.5 text-[12px] text-emerald-700/90">
+                  {submissionState.details?.orderId ? (
+                    <li>
+                      ID de pedido: <code className="font-mono">{submissionState.details.orderId}</code>
+                    </li>
+                  ) : null}
+                  {submissionState.details?.confirmedAt ? (
+                    <li>Confirmado en: {submissionState.details.confirmedAt}</li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+            {submissionState.status === 'error' ? (
+              <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
+                <p className="font-medium">
+                  {submissionState.message || 'No se pudo enviar el pedido.'}
+                </p>
+                {submissionState.details?.status ? (
+                  <p className="mt-1 text-[12px] text-rose-600/80">Código de estado: {submissionState.details.status}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </section>
       </div>
     );
