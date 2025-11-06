@@ -54,6 +54,17 @@ function buildLauncherConfig({
     };
   }
 
+  const providedCrm = domainServicesConfig?.atencionAlCliente?.crmBackend ?? {};
+  const crmApiOrigin = providedCrm.apiOrigin ?? domainServices?.atencionAlCliente?.crmBackend?.url;
+
+  if (crmApiOrigin) {
+    domains.atencionAlCliente = {
+      crmBackend: {
+        apiOrigin: crmApiOrigin,
+      },
+    };
+  }
+
   const config = {};
 
   if (Object.keys(systems).length > 0) {
