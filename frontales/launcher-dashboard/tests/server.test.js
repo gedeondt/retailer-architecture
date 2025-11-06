@@ -38,6 +38,9 @@ test('startDashboardServer sirve páginas independientes para cada sección', as
   const dominiosBody = await dominiosResponse.text();
   assert.match(dominiosBody, /Widgets por dominio/);
   assert.match(dominiosBody, /Ver catálogo/);
+  assert.match(dominiosBody, /ventasdigitales-ecommerce-widget-slot/);
+  assert.match(dominiosBody, /atencionalcliente-crm-widget-slot/);
+  assert.match(dominiosBody, /Cargando widget CRM…/);
 
   const sistemasResponse = await fetch(new URL('/sistemas.html', url));
   assert.equal(sistemasResponse.status, 200);
@@ -140,6 +143,25 @@ test('startDashboardServer expone el widget de ecommerce del dominio de ventas d
   const clientBody = await clientResponse.text();
   assert.match(clientBody, /SKU-ACOUSTIC-01/);
   assert.match(clientBody, /OrderConfirmed/);
+});
+
+test('startDashboardServer expone el widget CRM del dominio de atención al cliente', async (t) => {
+  const { url, close } = await startDashboardServer({ port: 0 });
+  t.after(close);
+
+  const widgetResponse = await fetch(new URL('/widgets/atencionalcliente/crm/widget', url));
+  assert.equal(widgetResponse.status, 200);
+  const widgetBody = await widgetResponse.text();
+  assert.match(widgetBody, /data-widget-id="atencionalcliente-crm"/);
+  assert.match(widgetBody, /widget-client\.jsx/);
+
+  const clientResponse = await fetch(
+    new URL('/widgets/atencionalcliente/crm/widget-client.jsx', url),
+  );
+  assert.equal(clientResponse.status, 200);
+  const clientBody = await clientResponse.text();
+  assert.match(clientBody, /Cargando entidades…/);
+  assert.match(clientBody, /CRM de Atención al Cliente/);
 });
 
 test('el widget de ecommerce utiliza el apiOrigin del runtime o la configuración', async (t) => {

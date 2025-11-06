@@ -11,6 +11,15 @@ function initDominiosWidgets() {
     defaultApiOrigin,
     errorTitle: 'Widget Ecommerce no disponible',
   });
+
+  const crmConfig = launcherConfig.domains?.atencionAlCliente?.crmBackend ?? {};
+  const defaultCrmApiOrigin = crmConfig.apiOrigin || 'http://127.0.0.1:4400';
+  dashboardWidgets.mountWidget({
+    slotId: 'atencionalcliente-crm-widget-slot',
+    defaultWidgetOrigin: `${baseOrigin}/widgets/atencionalcliente/crm/`,
+    defaultApiOrigin: defaultCrmApiOrigin,
+    errorTitle: 'Widget CRM no disponible',
+  });
 }
 
 if (document.readyState === 'loading') {

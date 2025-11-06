@@ -4,6 +4,7 @@ const http = require('node:http');
 const { once } = require('node:events');
 
 const { CrmSyncProcessor } = require('./crm-sync-processor');
+const { CrmEntityService, EntityServiceError } = require('./crm-entity-service');
 
 const DEFAULT_PORT = 4400;
 const DEFAULT_HOST = '127.0.0.1';
@@ -53,7 +54,7 @@ function sendNoContent(res, headers = {}) {
   res.end();
 }
 
-async function handleRequest(req, res, processor) {
+async function handleRequest(req, res, processor, entityService) {
   const corsHeaders = createCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -77,6 +78,36 @@ async function handleRequest(req, res, processor) {
     const result = await processor.syncPendingEvents();
     const status = result.inProgress ? 'in_progress' : 'completed';
     sendJson(res, 200, { status, result }, corsHeaders);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/entities') {
+    const items = entityService.listEntities();
+    sendJson(
+      res,
+      200,
+      {
+        items,
+        totalEntities: items.length,
+      },
+      corsHeaders,
+    );
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname.startsWith('/entities/')) {
+    const segments = url.pathname.split('/').filter(Boolean);
+    const entityId = segments[1];
+
+    if (!entityId) {
+      throw new HttpError(404, 'Entidad no encontrada');
+    }
+
+    const page = url.searchParams.get('page');
+    const pageSize = url.searchParams.get('pageSize');
+
+    const result = await entityService.listEntityItems(entityId, { page, pageSize });
+    sendJson(res, 200, result, corsHeaders);
     return;
   }
 
@@ -114,6 +145,13 @@ async function startCrmService(options = {}) {
 
   await processor.initialize();
 
+  const entityService = new CrmEntityService({
+    processor,
+    fetchImpl,
+    nosqlUrl,
+    collectionName: processor.collection?.name,
+  });
+
   let intervalId = null;
   const scheduleSync = pollIntervalMs !== null && pollIntervalMs !== undefined && pollIntervalMs > 0;
 
@@ -135,10 +173,10 @@ async function startCrmService(options = {}) {
   }
 
   const server = http.createServer((req, res) => {
-    Promise.resolve(handleRequest(req, res, processor))
+    Promise.resolve(handleRequest(req, res, processor, entityService))
       .catch((error) => {
         const corsHeaders = createCorsHeaders(req);
-        if (error instanceof HttpError) {
+        if (error instanceof HttpError || error instanceof EntityServiceError) {
           if (error.statusCode === 204) {
             sendNoContent(res, corsHeaders);
             return;
@@ -179,7 +217,7 @@ async function startCrmService(options = {}) {
       });
     });
 
-  return { url, close, server, processor };
+  return { url, close, server, processor, entityService };
 }
 
 module.exports = { startCrmService, HttpError };

@@ -8,6 +8,9 @@ const { buildLauncherConfig, injectLauncherConfig } = require('./launcher-config
 const {
   renderWidgetShell: renderEcommerceWidget,
 } = require('../../../dominios/ventasdigitales/servicios/ecommerce/src');
+const {
+  renderWidgetShell: renderCrmWidget,
+} = require('../../../dominios/atencion-al-cliente/servicios/crm-frontend/src');
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
 const ECOMMERCE_WIDGET_CLIENT = path.join(
@@ -16,6 +19,15 @@ const ECOMMERCE_WIDGET_CLIENT = path.join(
   'ventasdigitales',
   'servicios',
   'ecommerce',
+  'src',
+  'widget-client.jsx',
+);
+const CRM_WIDGET_CLIENT = path.join(
+  ROOT_DIR,
+  'dominios',
+  'atencion-al-cliente',
+  'servicios',
+  'crm-frontend',
   'src',
   'widget-client.jsx',
 );
@@ -88,6 +100,30 @@ function createLauncherApp(options = {}) {
   app.get('/widgets/ventasdigitales/ecommerce/widget-client.jsx', async (_req, res, next) => {
     try {
       const source = await fs.readFile(ECOMMERCE_WIDGET_CLIENT, 'utf8');
+      res.type('application/javascript').send(source);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/widgets/atencionalcliente/crm/widget', (req, res, next) => {
+    try {
+      const apiOriginRaw = typeof req.query?.apiOrigin === 'string' ? req.query.apiOrigin : undefined;
+      const runtimeApiOrigin = runtimeDomains?.atencionAlCliente?.crmBackend?.url;
+      const providedApiOrigin =
+        domainServicesConfig?.atencionAlCliente?.crmBackend?.apiOrigin ?? runtimeApiOrigin;
+      const apiOrigin =
+        apiOriginRaw && apiOriginRaw.trim() !== '' ? apiOriginRaw : providedApiOrigin ?? undefined;
+      const html = renderCrmWidget({ apiOrigin });
+      res.type('html').send(html);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/widgets/atencionalcliente/crm/widget-client.jsx', async (_req, res, next) => {
+    try {
+      const source = await fs.readFile(CRM_WIDGET_CLIENT, 'utf8');
       res.type('application/javascript').send(source);
     } catch (error) {
       next(error);
