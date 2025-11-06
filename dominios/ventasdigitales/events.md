@@ -7,19 +7,59 @@ Estos eventos disparan las sagas principales del ciclo de vida del pedido y comu
   "name": "OrderConfirmed",
   "description": "Declara que el checkout finalizó correctamente y el pedido queda listo para fulfillment.",
   "payload": {
-    "orderId": "uuid",
-    "customerId": "uuid",
-    "paymentId": "uuid",
+    "order": {
+      "id": "uuid",
+      "customerId": "uuid",
+      "channelOrigin": "string",
+      "status": "string",
+      "total": {
+        "amount": "number",
+        "currency": "ISO-4217"
+      },
+      "paymentIds": ["uuid"],
+      "confirmedAt": "ISO-8601 timestamp",
+      "items": [
+        {
+          "sku": "string",
+          "quantity": "number"
+        }
+      ]
+    },
+    "customer": {
+      "id": "uuid",
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string",
+      "phone": "string"
+    },
     "items": [
       {
+        "id": "uuid",
+        "orderId": "uuid",
         "sku": "string",
         "quantity": "number",
-        "price": "number"
+        "unitPrice": "number",
+        "lineTotal": "number",
+        "promotions": ["string"],
+        "position": "number"
       }
     ],
-    "totalAmount": "number",
-    "currency": "ISO-4217",
-    "confirmedAt": "ISO-8601 timestamp"
+    "payment": {
+      "id": "uuid",
+      "orderId": "uuid",
+      "method": "string",
+      "amount": "number",
+      "currency": "ISO-4217",
+      "status": "string",
+      "securityCodeProvided": "boolean",
+      "card": {
+        "holderName": "string",
+        "last4": "string",
+        "brand": "string",
+        "expiryMonth": "string",
+        "expiryYear": "string"
+      }
+    }
   },
   "consumedBy": ["logistica", "contabilidad", "atencion-al-cliente"],
   "saga": "Cumplimiento del pedido"
