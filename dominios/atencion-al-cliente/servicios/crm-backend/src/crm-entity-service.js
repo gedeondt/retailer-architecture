@@ -123,7 +123,7 @@ class CrmEntityService {
       processor,
       fetchImpl,
       nosqlUrl = processor?.nosqlUrl ?? 'http://127.0.0.1:4100',
-      collectionName = processor?.collection?.name ?? 'crm-customers',
+      collectionName = processor?.collection?.name ?? 'atencionalcliente-customers',
       defaultPageSize = DEFAULT_PAGE_SIZE,
     } = options;
 

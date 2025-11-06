@@ -56,19 +56,19 @@ test('startLauncher inicia los sistemas compartidos y expone su configuración',
   const nosqlPayload = await nosqlResponse.json();
   const collectionNames = nosqlPayload.items.map((item) => item.name);
   assert.ok(
-    collectionNames.includes('digital-orders'),
+    collectionNames.includes('ventasdigitales-orders'),
     'crea la colección de pedidos digitales al iniciar la API de ecommerce',
   );
   assert.ok(
-    collectionNames.includes('digital-order-lines'),
+    collectionNames.includes('ventasdigitales-order-lines'),
     'crea la colección de líneas del pedido digital',
   );
   assert.ok(
-    collectionNames.includes('digital-order-payments'),
+    collectionNames.includes('ventasdigitales-order-payments'),
     'crea la colección de pagos del pedido digital',
   );
   assert.ok(
-    collectionNames.includes('crm-customers'),
+    collectionNames.includes('atencionalcliente-customers'),
     'crea la colección de clientes del CRM al iniciar el servicio de atención al cliente',
   );
 
