@@ -238,4 +238,70 @@ test('startCrmService expone endpoints HTTP para controlar la sincronización', 
   assert.equal(lookupResponse.status, 200);
   const lookupPayload = await lookupResponse.json();
   assert.equal(lookupPayload.items.length, 1, 'crea el cliente a partir de la sincronización manual');
+
+  await publishOrderConfirmed(eventBus.url, {
+    order: {
+      id: 'ORDER-HTTP-2',
+      customerId: 'CUSTOMER-HTTP-1',
+      status: 'preparing',
+      channelOrigin: 'contact_center',
+      paymentIds: ['PAY-HTTP-2'],
+      confirmedAt: '2024-06-03T14:00:00.000Z',
+      total: { amount: 120, currency: 'EUR' },
+    },
+    customer: {
+      id: 'CUSTOMER-HTTP-1',
+      firstName: 'Lucía',
+      lastName: 'Pérez',
+      email: 'lucia@example.com',
+    },
+    items: [],
+    payment: {
+      id: 'PAY-HTTP-2',
+      orderId: 'ORDER-HTTP-2',
+      method: 'credit_card',
+      amount: 120,
+      currency: 'EUR',
+      status: 'captured',
+    },
+  });
+
+  const syncAgainResponse = await fetch(new URL('/tasks/sync', url), { method: 'POST' });
+  assert.equal(syncAgainResponse.status, 200);
+
+  const entitiesResponse = await fetch(new URL('/entities', url));
+  assert.equal(entitiesResponse.status, 200);
+  const entitiesPayload = await entitiesResponse.json();
+  assert.ok(Array.isArray(entitiesPayload.items));
+  assert.equal(entitiesPayload.totalEntities, 2);
+  const customerEntity = entitiesPayload.items.find((entry) => entry.id === 'crm-customers');
+  assert.ok(customerEntity, 'exponen la entidad de clientes');
+  assert.equal(customerEntity.fields.length, 4, 'cada entidad define cuatro columnas relevantes');
+
+  const customersResponse = await fetch(new URL('/entities/crm-customers?page=1&pageSize=5', url));
+  assert.equal(customersResponse.status, 200);
+  const customersPayload = await customersResponse.json();
+  assert.equal(customersPayload.totalItems, 1);
+  assert.deepEqual(
+    customersPayload.entity.fields.map((field) => field.key),
+    ['customerId', 'fullName', 'email', 'lastOrderStatus'],
+  );
+  const customerRow = customersPayload.items[0];
+  assert.equal(customerRow.customerId, 'CUSTOMER-HTTP-1');
+  assert.equal(customerRow.fullName, 'Lucía Pérez');
+
+  const ordersResponse = await fetch(new URL('/entities/crm-orders?page=1&pageSize=10', url));
+  assert.equal(ordersResponse.status, 200);
+  const ordersPayload = await ordersResponse.json();
+  assert.ok(ordersPayload.totalItems >= 2, 'agrega los pedidos sincronizados');
+  assert.deepEqual(
+    ordersPayload.entity.fields.map((field) => field.key),
+    ['orderId', 'customerId', 'status', 'confirmedAt'],
+  );
+  const orderIds = ordersPayload.items.map((item) => item.orderId);
+  assert.ok(orderIds.includes('ORDER-HTTP-1'));
+  assert.ok(orderIds.includes('ORDER-HTTP-2'));
+
+  const invalidEntityResponse = await fetch(new URL('/entities/unknown', url));
+  assert.equal(invalidEntityResponse.status, 404);
 });

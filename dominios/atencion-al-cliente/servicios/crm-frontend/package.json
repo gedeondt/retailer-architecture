@@ -1,0 +1,14 @@
+{
+  "name": "@retailer/atencionalcliente-crm-frontend",
+  "version": "0.1.0",
+  "description": "Microfrontend CRM para visualizar entidades de Atención al Cliente",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
