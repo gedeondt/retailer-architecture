@@ -66,7 +66,7 @@ El dashboard del launcher funciona como el punto de entrada visual para los micr
 
 ### Prueba de concepto inicial
 
-El dashboard se sirve ahora desde el paquete [`frontales/launcher-dashboard`](frontales/launcher-dashboard), un microproyecto con Express que arranca los sistemas transversales y entrega las páginas estáticas alojadas en [`dashboard/`](dashboard). El script raíz [`launcher.js`](launcher.js) delega en este paquete para mantener la compatibilidad con la experiencia existente.
+El dashboard se sirve ahora desde el paquete unificado [`dashboard`](dashboard), que reúne los archivos estáticos y el servidor Express responsable de exponerlos. El script raíz [`launcher.js`](launcher.js) delega en este paquete para mantener la compatibilidad con la experiencia existente y centralizar toda la lógica del dashboard en un único módulo.
 
 Para visualizarlo desde la raíz del repositorio:
 
@@ -77,7 +77,7 @@ node launcher.js
 O bien, ejecutando el paquete dedicado:
 
 ```bash
-cd frontales/launcher-dashboard
+cd dashboard
 npm start
 ```
 

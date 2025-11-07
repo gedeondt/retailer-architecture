@@ -3,8 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
-const DASHBOARD_DIR = path.join(ROOT_DIR, 'dashboard');
+const DASHBOARD_DIR = path.resolve(__dirname, '..');
 
 const PAGE_MAP = new Map([
   ['/', 'index.html'],

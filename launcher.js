@@ -1,11 +1,54 @@
 'use strict';
 
-const { startDashboardServer, createDashboardHTML } = require('./frontales/launcher-dashboard/src/server');
-const { startNosqlService } = require('./sistemas/nosql-db/src/server');
-const { startEventBusService } = require('./sistemas/event-bus/src/server');
-const { startCheckoutService } = require('./dominios/ventasdigitales/servicios/ecommerce-api/src');
-const { startCrmService } = require('./dominios/atencion-al-cliente/servicios/crm-backend/src');
+const path = require('node:path');
+
+const { startDashboardServer, createDashboardHTML } = require('./dashboard/server/server');
+const { loadLauncherArtifacts } = require('./lib/launcher/config-loader');
+const { resolveFirstValue } = require('./lib/launcher/value-resolver');
 const { createServiceLogCollector } = require('./lib/logging/service-log-collector');
+
+function createWidgetHandlers(microfronts, context) {
+  const { domainServicesConfig, runtimeDomains } = context;
+
+  return microfronts.map((descriptor) => {
+    const buildOptions = (req) => {
+      const params = {};
+      const sourcesMap = descriptor.parameters ?? {};
+
+      for (const [paramName, sources] of Object.entries(sourcesMap)) {
+        const value = resolveFirstValue(sources, {
+          query: req?.query,
+          domainConfig: domainServicesConfig,
+          runtimeDomain: runtimeDomains,
+          defaults: descriptor.defaults ?? {},
+        });
+
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed !== '') {
+            params[paramName] = trimmed;
+          }
+          continue;
+        }
+
+        if (value !== undefined) {
+          params[paramName] = value;
+        }
+      }
+
+      return params;
+    };
+
+    return {
+      id: descriptor.id,
+      widgetRoute: descriptor.widgetRoute,
+      clientRoute: descriptor.clientRoute,
+      clientSourcePath: descriptor.clientSourcePath,
+      clientContentType: descriptor.clientContentType,
+      render: (req) => descriptor.render(buildOptions(req)),
+    };
+  });
+}
 
 async function startLauncher(options = {}) {
   const {
@@ -21,107 +64,93 @@ async function startLauncher(options = {}) {
   const logCollector = createServiceLogCollector({ limitPerLevel: logBufferLimit });
   logCollector.attachConsole(console);
 
+  const artifacts = await loadLauncherArtifacts({ rootDir: path.resolve(__dirname) });
+  const { systems, systemsById, domainServices, microfronts } = artifacts;
+
   const launchedSystems = [];
   const launchedDomainServices = [];
-  let nosqlService = null;
-  let eventBusService = null;
-  let ecommerceApiService = null;
-  let crmService = null;
+  const runtimeSystemsById = new Map();
+  const runtimeDomains = {};
 
   try {
     if (startSystems) {
-      nosqlService = await logCollector.withServiceContext('nosql-db', () =>
-        startNosqlService({ ...(systemsConfig.nosqlDb ?? {}) }),
-      );
-      launchedSystems.push(nosqlService);
+      for (const systemDescriptor of systems) {
+        const systemOptions = systemsConfig?.[systemDescriptor.configKey] ?? {};
+        if (systemOptions.startService === false) {
+          continue;
+        }
 
-      const eventBusOptions = systemsConfig.eventBus ?? {};
-      if (eventBusOptions.startService !== false) {
-        const { startService: _ignored, ...serviceOptions } = eventBusOptions;
-        eventBusService = await logCollector.withServiceContext('event-bus', () =>
-          startEventBusService(serviceOptions),
+        const { startService: _ignored, ...serviceOptions } = systemOptions;
+        const instance = await logCollector.withServiceContext(systemDescriptor.id, () =>
+          systemDescriptor.start(serviceOptions),
         );
-        launchedSystems.push(eventBusService);
+
+        launchedSystems.push(instance);
+        runtimeSystemsById.set(systemDescriptor.id, instance);
       }
     }
 
     if (startDomainServices) {
-      const ventasDigitalesConfig = domainServicesConfig.ventasDigitales ?? {};
-      const ecommerceConfig = ventasDigitalesConfig.ecommerceApi ?? {};
-      if (ecommerceConfig.startService !== false) {
-        const { startService: _ignored, ...serviceOptions } = ecommerceConfig;
+      for (const serviceDescriptor of domainServices) {
+        const domainConfigSection = domainServicesConfig?.[serviceDescriptor.configDomainKey] ?? {};
+        const serviceConfig = domainConfigSection?.[serviceDescriptor.configServiceKey] ?? {};
 
-        const nosqlUrl =
-          serviceOptions.nosqlUrl ??
-          nosqlService?.url ??
-          systemsConfig?.nosqlDb?.apiOrigin ??
-          systemsConfig?.nosqlDb?.widgetOrigin;
-        const eventBusUrl =
-          serviceOptions.eventBusUrl ??
-          eventBusService?.url ??
-          systemsConfig?.eventBus?.apiOrigin ??
-          systemsConfig?.eventBus?.widgetOrigin;
-
-        if (!nosqlUrl) {
-          throw new Error(
-            'No se pudo determinar la URL del servicio NoSQL para iniciar ventasdigitales-ecommerce-api.',
-          );
+        if (serviceConfig.startService === false) {
+          continue;
         }
 
-        if (!eventBusUrl) {
-          throw new Error(
-            'No se pudo determinar la URL del Event Bus para iniciar ventasdigitales-ecommerce-api.',
-          );
+        const { startService: _ignored, ...serviceOptions } = serviceConfig;
+        const resolvedOptions = { ...serviceOptions };
+
+        for (const dependency of serviceDescriptor.dependencies ?? []) {
+          if (dependency.type !== 'system') {
+            continue;
+          }
+
+          const systemDescriptor = systemsById.get(dependency.id);
+          const runtimeDependency = systemDescriptor ? runtimeSystemsById.get(dependency.id) : undefined;
+          const dependencyConfig = systemDescriptor
+            ? systemsConfig?.[systemDescriptor.configKey] ?? {}
+            : {};
+
+          const value = resolveFirstValue(dependency.sources, {
+            options: serviceOptions,
+            runtime: runtimeDependency,
+            config: dependencyConfig,
+            defaults: systemDescriptor?.defaults ?? {},
+          });
+
+          if (value === undefined) {
+            if (dependency.required !== false) {
+              throw new Error(
+                `No se pudo determinar el parámetro ${dependency.optionsKey} para ` +
+                  `${serviceDescriptor.configDomainKey}.${serviceDescriptor.configServiceKey} (dependencia ${dependency.id}).`,
+              );
+            }
+            continue;
+          }
+
+          resolvedOptions[dependency.optionsKey] = value;
         }
 
-        ecommerceApiService = await logCollector.withServiceContext('ventasdigitales-ecommerce-api', () =>
-          startCheckoutService({ ...serviceOptions, nosqlUrl, eventBusUrl }),
+        const serviceId = `${serviceDescriptor.configDomainKey}-${serviceDescriptor.configServiceKey}`;
+        const instance = await logCollector.withServiceContext(serviceId, () =>
+          serviceDescriptor.start(resolvedOptions),
         );
-        launchedDomainServices.push(ecommerceApiService);
-      }
 
-      const atencionConfig = domainServicesConfig.atencionAlCliente ?? {};
-      const crmConfig = atencionConfig.crmBackend ?? {};
-      if (crmConfig.startService !== false) {
-        const { startService: _ignoredCrm, ...serviceOptions } = crmConfig;
+        launchedDomainServices.push(instance);
 
-        const crmNosqlUrl =
-          serviceOptions.nosqlUrl ??
-          nosqlService?.url ??
-          systemsConfig?.nosqlDb?.apiOrigin ??
-          systemsConfig?.nosqlDb?.widgetOrigin;
-        const crmEventBusUrl =
-          serviceOptions.eventBusUrl ??
-          eventBusService?.url ??
-          systemsConfig?.eventBus?.apiOrigin ??
-          systemsConfig?.eventBus?.widgetOrigin;
-
-        if (!crmNosqlUrl) {
-          throw new Error(
-            'No se pudo determinar la URL del servicio NoSQL para iniciar atencionalcliente-crm-backend.',
-          );
+        if (!runtimeDomains[serviceDescriptor.configDomainKey]) {
+          runtimeDomains[serviceDescriptor.configDomainKey] = {};
         }
-
-        if (!crmEventBusUrl) {
-          throw new Error(
-            'No se pudo determinar la URL del Event Bus para iniciar atencionalcliente-crm-backend.',
-          );
-        }
-
-        crmService = await logCollector.withServiceContext('atencionalcliente-crm-backend', () =>
-          startCrmService({ ...serviceOptions, nosqlUrl: crmNosqlUrl, eventBusUrl: crmEventBusUrl }),
-        );
-        launchedDomainServices.push(crmService);
+        runtimeDomains[serviceDescriptor.configDomainKey][serviceDescriptor.configServiceKey] = instance;
       }
     }
 
-    const runtimeDomains = {};
-    if (ecommerceApiService) {
-      runtimeDomains.ventasDigitales = { ecommerceApi: ecommerceApiService };
-    }
-    if (crmService) {
-      runtimeDomains.atencionAlCliente = { crmBackend: crmService };
-    }
+    const widgetHandlers = createWidgetHandlers(microfronts, {
+      domainServicesConfig,
+      runtimeDomains,
+    });
 
     const { url, close: closeServer, server } = await logCollector.withServiceContext(
       'launcher-dashboard',
@@ -129,10 +158,13 @@ async function startLauncher(options = {}) {
         startDashboardServer({
           port,
           host,
-          runtimeSystems: { nosql: nosqlService, eventBus: eventBusService },
+          systemDescriptors: systems,
+          domainServiceDescriptors: domainServices,
+          runtimeSystemsById,
           runtimeDomains,
           systemsConfig,
           domainServicesConfig,
+          widgets: widgetHandlers,
           logCollector,
         }),
     );
@@ -140,8 +172,8 @@ async function startLauncher(options = {}) {
     const close = async () => {
       try {
         await Promise.allSettled([
-          ...launchedSystems.map((system) => system.close()),
-          ...launchedDomainServices.map((service) => service.close()),
+          ...launchedSystems.map((system) => system?.close?.()).filter(Boolean),
+          ...launchedDomainServices.map((service) => service?.close?.()).filter(Boolean),
         ]);
         await closeServer();
       } finally {
@@ -149,11 +181,19 @@ async function startLauncher(options = {}) {
       }
     };
 
+    const systemsRuntime = {};
+    for (const systemDescriptor of systems) {
+      const instance = runtimeSystemsById.get(systemDescriptor.id);
+      if (instance) {
+        systemsRuntime[systemDescriptor.configKey] = instance;
+      }
+    }
+
     return {
       url,
       close,
       server,
-      systems: { nosql: nosqlService, eventBus: eventBusService },
+      systems: systemsRuntime,
       domains: runtimeDomains,
       logs: logCollector,
     };

@@ -9,7 +9,10 @@ async function startDashboardServer(options = {}) {
   const {
     port = 3000,
     host = '127.0.0.1',
-    runtimeSystems = {},
+    widgets = [],
+    systemDescriptors = [],
+    domainServiceDescriptors = [],
+    runtimeSystemsById = new Map(),
     runtimeDomains = {},
     systemsConfig = {},
     domainServicesConfig = {},
@@ -18,7 +21,10 @@ async function startDashboardServer(options = {}) {
   } = options;
 
   const app = createLauncherApp({
-    runtimeSystems,
+    widgets,
+    systemDescriptors,
+    domainServiceDescriptors,
+    runtimeSystemsById,
     runtimeDomains,
     systemsConfig,
     domainServicesConfig,

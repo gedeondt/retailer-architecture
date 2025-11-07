@@ -1,0 +1,16 @@
+{
+  "type": "microfront",
+  "id": "atencionalcliente-crm",
+  "module": "./src/index.js",
+  "renderExport": "renderWidgetShell",
+  "clientSource": "./src/widget-client.jsx",
+  "clientExport": "WIDGET_CLIENT_PATH",
+  "widgetRoute": "/widgets/atencionalcliente/crm/widget",
+  "parameters": {
+    "apiOrigin": [
+      "query.apiOrigin",
+      "domainConfig.atencionAlCliente.crmBackend.apiOrigin",
+      "runtimeDomain.atencionAlCliente.crmBackend.url"
+    ]
+  }
+}

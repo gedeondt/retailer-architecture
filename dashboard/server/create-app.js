@@ -2,35 +2,9 @@
 
 const express = require('express');
 const fs = require('node:fs/promises');
-const path = require('node:path');
 const { getDashboardDir, resolveDashboardPage, readDashboardPage } = require('./dashboard-files');
 const { buildLauncherConfig, injectLauncherConfig } = require('./launcher-config');
-const {
-  renderWidgetShell: renderEcommerceWidget,
-} = require('../../../dominios/ventasdigitales/servicios/ecommerce/src');
-const {
-  renderWidgetShell: renderCrmWidget,
-} = require('../../../dominios/atencion-al-cliente/servicios/crm-frontend/src');
 
-const ROOT_DIR = path.resolve(__dirname, '..', '..', '..');
-const ECOMMERCE_WIDGET_CLIENT = path.join(
-  ROOT_DIR,
-  'dominios',
-  'ventasdigitales',
-  'servicios',
-  'ecommerce',
-  'src',
-  'widget-client.jsx',
-);
-const CRM_WIDGET_CLIENT = path.join(
-  ROOT_DIR,
-  'dominios',
-  'atencion-al-cliente',
-  'servicios',
-  'crm-frontend',
-  'src',
-  'widget-client.jsx',
-);
 const LOG_PREFIX = '[launcher-dashboard]';
 
 function logError(message, ...args) {
@@ -40,7 +14,10 @@ function logError(message, ...args) {
 
 function createLauncherApp(options = {}) {
   const {
-    runtimeSystems = {},
+    widgets = [],
+    systemDescriptors = [],
+    domainServiceDescriptors = [],
+    runtimeSystemsById = new Map(),
     runtimeDomains = {},
     systemsConfig = {},
     domainServicesConfig = {},
@@ -82,53 +59,33 @@ function createLauncherApp(options = {}) {
     });
   });
 
-  app.get('/widgets/ventasdigitales/ecommerce/widget', (req, res, next) => {
-    try {
-      const apiOriginRaw = typeof req.query?.apiOrigin === 'string' ? req.query.apiOrigin : undefined;
-      const runtimeApiOrigin = runtimeDomains?.ventasDigitales?.ecommerceApi?.url;
-      const providedApiOrigin =
-        domainServicesConfig?.ventasDigitales?.ecommerceApi?.apiOrigin ?? runtimeApiOrigin;
-      const apiOrigin =
-        apiOriginRaw && apiOriginRaw.trim() !== '' ? apiOriginRaw : providedApiOrigin ?? undefined;
-      const html = renderEcommerceWidget({ apiOrigin });
-      res.type('html').send(html);
-    } catch (error) {
-      next(error);
+  for (const widget of widgets) {
+    if (!widget || typeof widget !== 'object') {
+      continue;
     }
-  });
 
-  app.get('/widgets/ventasdigitales/ecommerce/widget-client.jsx', async (_req, res, next) => {
-    try {
-      const source = await fs.readFile(ECOMMERCE_WIDGET_CLIENT, 'utf8');
-      res.type('application/javascript').send(source);
-    } catch (error) {
-      next(error);
+    if (widget.widgetRoute && typeof widget.render === 'function') {
+      app.get(widget.widgetRoute, (req, res, next) => {
+        try {
+          const html = widget.render(req);
+          res.type('html').send(html);
+        } catch (error) {
+          next(error);
+        }
+      });
     }
-  });
 
-  app.get('/widgets/atencionalcliente/crm/widget', (req, res, next) => {
-    try {
-      const apiOriginRaw = typeof req.query?.apiOrigin === 'string' ? req.query.apiOrigin : undefined;
-      const runtimeApiOrigin = runtimeDomains?.atencionAlCliente?.crmBackend?.url;
-      const providedApiOrigin =
-        domainServicesConfig?.atencionAlCliente?.crmBackend?.apiOrigin ?? runtimeApiOrigin;
-      const apiOrigin =
-        apiOriginRaw && apiOriginRaw.trim() !== '' ? apiOriginRaw : providedApiOrigin ?? undefined;
-      const html = renderCrmWidget({ apiOrigin });
-      res.type('html').send(html);
-    } catch (error) {
-      next(error);
+    if (widget.clientRoute && widget.clientSourcePath) {
+      app.get(widget.clientRoute, async (_req, res, next) => {
+        try {
+          const source = await fs.readFile(widget.clientSourcePath, 'utf8');
+          res.type(widget.clientContentType ?? 'application/javascript').send(source);
+        } catch (error) {
+          next(error);
+        }
+      });
     }
-  });
-
-  app.get('/widgets/atencionalcliente/crm/widget-client.jsx', async (_req, res, next) => {
-    try {
-      const source = await fs.readFile(CRM_WIDGET_CLIENT, 'utf8');
-      res.type('application/javascript').send(source);
-    } catch (error) {
-      next(error);
-    }
-  });
+  }
 
   app.get(['/', '/index.html', '/dominios', '/dominios.html'], (_req, res, next) => {
     try {
@@ -143,10 +100,11 @@ function createLauncherApp(options = {}) {
     try {
       const html = readDashboardPage('sistemas.html');
       const launcherConfig = buildLauncherConfig({
-        nosqlService: runtimeSystems.nosql,
-        eventBusService: runtimeSystems.eventBus,
+        systemDescriptors,
+        domainServiceDescriptors,
+        runtimeSystemsById,
+        runtimeDomains,
         systemsConfig,
-        domainServices: runtimeDomains,
         domainServicesConfig,
       });
       const enhancedHtml = injectLauncherConfig(html, launcherConfig);

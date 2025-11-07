@@ -1,0 +1,12 @@
+{
+  "type": "system",
+  "id": "event-bus",
+  "configKey": "eventBus",
+  "startModule": "./src/server.js",
+  "startExport": "startEventBusService",
+  "expose": {
+    "widgetOrigin": ["runtime.url", "config.widgetOrigin"],
+    "apiOrigin": ["config.apiOrigin", "runtime.url", "config.widgetOrigin"],
+    "channel": ["config.channel"]
+  }
+}

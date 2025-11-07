@@ -1,0 +1,27 @@
+{
+  "type": "domain-service",
+  "id": "ventasdigitales-ecommerce-api",
+  "configDomainKey": "ventasDigitales",
+  "configServiceKey": "ecommerceApi",
+  "startModule": "./src/index.js",
+  "startExport": "startCheckoutService",
+  "dependencies": [
+    {
+      "type": "system",
+      "id": "nosql-db",
+      "optionsKey": "nosqlUrl",
+      "required": true,
+      "sources": ["options.nosqlUrl", "runtime.url", "config.apiOrigin", "config.widgetOrigin"]
+    },
+    {
+      "type": "system",
+      "id": "event-bus",
+      "optionsKey": "eventBusUrl",
+      "required": true,
+      "sources": ["options.eventBusUrl", "runtime.url", "config.apiOrigin", "config.widgetOrigin"]
+    }
+  ],
+  "expose": {
+    "apiOrigin": ["config.apiOrigin", "runtime.url"]
+  }
+}

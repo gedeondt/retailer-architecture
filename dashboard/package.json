@@ -2,9 +2,9 @@
   "name": "@retailer/launcher-dashboard",
   "version": "1.0.0",
   "description": "Dashboard launcher para orquestar microfronts del retailer",
-  "main": "src/server.js",
+  "main": "server/server.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node server/index.js",
     "test": "node --test"
   },
   "keywords": [

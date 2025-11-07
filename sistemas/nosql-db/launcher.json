@@ -1,0 +1,11 @@
+{
+  "type": "system",
+  "id": "nosql-db",
+  "configKey": "nosqlDb",
+  "startModule": "./src/server.js",
+  "startExport": "startNosqlService",
+  "expose": {
+    "widgetOrigin": ["runtime.url", "config.widgetOrigin"],
+    "apiOrigin": ["config.apiOrigin", "runtime.url", "config.widgetOrigin"]
+  }
+}

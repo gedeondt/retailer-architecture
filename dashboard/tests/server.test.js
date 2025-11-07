@@ -6,7 +6,84 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 
-const { startDashboardServer, createDashboardHTML } = require('../src/server');
+const { startDashboardServer, createDashboardHTML } = require('../server/server');
+const { loadLauncherArtifacts } = require('../../lib/launcher/config-loader');
+const { resolveFirstValue } = require('../../lib/launcher/value-resolver');
+
+const artifactsPromise = loadLauncherArtifacts({ rootDir: path.resolve(__dirname, '..', '..') });
+
+function normalizeRuntimeSystems(runtimeSystems) {
+  if (runtimeSystems instanceof Map) {
+    return runtimeSystems;
+  }
+
+  if (!runtimeSystems || typeof runtimeSystems !== 'object') {
+    return new Map();
+  }
+
+  return new Map(Object.entries(runtimeSystems));
+}
+
+function createWidgetHandlersForTest(microfronts, options = {}) {
+  const { domainServicesConfig = {}, runtimeDomains = {} } = options;
+
+  return microfronts.map((descriptor) => ({
+    widgetRoute: descriptor.widgetRoute,
+    clientRoute: descriptor.clientRoute,
+    clientSourcePath: descriptor.clientSourcePath,
+    clientContentType: descriptor.clientContentType,
+    render: (req) => {
+      const params = {};
+      const sources = descriptor.parameters ?? {};
+      for (const [paramName, paths] of Object.entries(sources)) {
+        let value = resolveFirstValue(paths, {
+          query: req?.query,
+          domainConfig: domainServicesConfig,
+          runtimeDomain: runtimeDomains,
+          defaults: descriptor.defaults ?? {},
+        });
+        if (typeof value === 'string') {
+          value = value.trim();
+        }
+        if (value !== undefined && value !== null && value !== '') {
+          params[paramName] = value;
+        }
+      }
+      return descriptor.render(params);
+    },
+  }));
+}
+
+async function startTestDashboardServer(options = {}) {
+  const artifacts = await artifactsPromise;
+  const {
+    systems,
+    domainServices,
+    microfronts,
+  } = artifacts;
+
+  const {
+    runtimeDomains = {},
+    domainServicesConfig = {},
+    runtimeSystemsById,
+    widgets,
+    ...rest
+  } = options;
+
+  const resolvedWidgets = widgets ?? createWidgetHandlersForTest(microfronts, { domainServicesConfig, runtimeDomains });
+  const resolvedRuntimeSystems = normalizeRuntimeSystems(runtimeSystemsById);
+
+  return startDashboardServer({
+    port: 0,
+    systemDescriptors: systems,
+    domainServiceDescriptors: domainServices,
+    runtimeSystemsById: resolvedRuntimeSystems,
+    runtimeDomains,
+    domainServicesConfig,
+    widgets: resolvedWidgets,
+    ...rest,
+  });
+}
 
 test('createDashboardHTML lee la página principal desde el sistema de archivos', () => {
   const html = createDashboardHTML();
@@ -30,7 +107,7 @@ test('createDashboardHTML lee la página principal desde el sistema de archivos'
 });
 
 test('startDashboardServer sirve páginas independientes para cada sección', async (t) => {
-  const { url, close } = await startDashboardServer({ port: 0 });
+  const { url, close } = await startTestDashboardServer();
   t.after(close);
 
   const homeResponse = await fetch(url);
@@ -62,14 +139,14 @@ test('startDashboardServer sirve páginas independientes para cada sección', as
 test('startDashboardServer inyecta la configuración de los widgets cuando se proporcionan sistemas', async (t) => {
   const nosqlDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-nosql-config-'));
   const eventBusDir = await fs.mkdtemp(path.join(os.tmpdir(), 'launcher-eventbus-config-'));
-  const runtimeSystems = {
-    nosql: { url: 'http://127.0.0.1:5001' },
-    eventBus: { url: 'http://127.0.0.1:5002' },
-  };
 
-  const { url, close } = await startDashboardServer({
-    port: 0,
-    runtimeSystems,
+  const runtimeSystems = new Map([
+    ['nosql-db', { url: 'http://127.0.0.1:5001' }],
+    ['event-bus', { url: 'http://127.0.0.1:5002' }],
+  ]);
+
+  const { url, close } = await startTestDashboardServer({
+    runtimeSystemsById: runtimeSystems,
     systemsConfig: {
       nosqlDb: { apiOrigin: 'http://127.0.0.1:6001', dataDir: nosqlDir },
       eventBus: { apiOrigin: 'http://127.0.0.1:6002', dataDir: eventBusDir, channel: 'ventas' },
@@ -116,14 +193,14 @@ test('startDashboardServer inyecta la configuración de los widgets cuando se pr
 });
 
 test('startDashboardServer utiliza el puerto 3000 por defecto', async (t) => {
-  const { url, close } = await startDashboardServer();
+  const { url, close } = await startTestDashboardServer({ port: 3000 });
   t.after(close);
 
   assert.match(url, /:3000\//);
 });
 
 test('startDashboardServer sirve los archivos JavaScript del dashboard', async (t) => {
-  const { url, close } = await startDashboardServer({ port: 0 });
+  const { url, close } = await startTestDashboardServer();
   t.after(close);
 
   const scriptResponse = await fetch(new URL('/dashboard/scripts/dashboard-layout.js', url));
@@ -133,7 +210,7 @@ test('startDashboardServer sirve los archivos JavaScript del dashboard', async (
 });
 
 test('startDashboardServer expone el widget de ecommerce del dominio de ventas digitales', async (t) => {
-  const { url, close } = await startDashboardServer({ port: 0 });
+  const { url, close } = await startTestDashboardServer();
   t.after(close);
 
   const widgetResponse = await fetch(new URL('/widgets/ventasdigitales/ecommerce/widget', url));
@@ -152,7 +229,7 @@ test('startDashboardServer expone el widget de ecommerce del dominio de ventas d
 });
 
 test('startDashboardServer expone el widget CRM del dominio de atención al cliente', async (t) => {
-  const { url, close } = await startDashboardServer({ port: 0 });
+  const { url, close } = await startTestDashboardServer();
   t.after(close);
 
   const widgetResponse = await fetch(new URL('/widgets/atencionalcliente/crm/widget', url));
@@ -177,8 +254,7 @@ test('el widget de ecommerce utiliza el apiOrigin del runtime o la configuració
     },
   };
 
-  const { url, close } = await startDashboardServer({
-    port: 0,
+  const { url, close } = await startTestDashboardServer({
     runtimeDomains,
     domainServicesConfig: {
       ventasDigitales: {
@@ -240,7 +316,7 @@ test('GET /api/logs responde sin emitir nuevos logs', async (t) => {
     getServiceNames: () => ['launcher'],
   };
 
-  const { url, close } = await startDashboardServer({ port: 0, logCollector });
+  const { url, close } = await startTestDashboardServer({ logCollector });
 
   t.after(close);
 
