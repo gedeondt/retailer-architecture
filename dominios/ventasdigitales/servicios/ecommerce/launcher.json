@@ -1,0 +1,16 @@
+{
+  "type": "microfront",
+  "id": "ventasdigitales-ecommerce",
+  "module": "./src/index.js",
+  "renderExport": "renderWidgetShell",
+  "clientSource": "./src/widget-client.jsx",
+  "clientExport": "WIDGET_CLIENT_PATH",
+  "widgetRoute": "/widgets/ventasdigitales/ecommerce/widget",
+  "parameters": {
+    "apiOrigin": [
+      "query.apiOrigin",
+      "domainConfig.ventasDigitales.ecommerceApi.apiOrigin",
+      "runtimeDomain.ventasDigitales.ecommerceApi.url"
+    ]
+  }
+}
